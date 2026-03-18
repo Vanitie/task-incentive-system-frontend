@@ -238,10 +238,10 @@ onUnmounted(() => {
 }
 
 .number-pop {
-  animation: numberPulse 0.45s ease;
+  animation: number-pulse 0.45s ease;
 }
 
-@keyframes numberPulse {
+@keyframes number-pulse {
   0% {
     opacity: 0.75;
     transform: scale(0.97);

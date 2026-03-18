@@ -41,6 +41,9 @@ importers:
       js-cookie:
         specifier: ^3.0.5
         version: 3.0.5
+      json-bigint:
+        specifier: ^1.0.0
+        version: 1.0.0
       localforage:
         specifier: ^1.10.0
         version: 1.10.0
@@ -111,6 +114,9 @@ importers:
       '@types/js-cookie':
         specifier: ^3.0.6
         version: 3.0.6
+      '@types/json-bigint':
+        specifier: ^1.0.4
+        version: 1.0.4
       '@types/node':
         specifier: ^20.19.23
         version: 20.19.23
@@ -1302,6 +1308,9 @@ packages:
   '@types/js-cookie@3.0.6':
     resolution: {integrity: sha512-wkw9yd1kEXOPnvEeEV1Go1MmxtBJL0RR79aOTAApecWFVu7w0NNXNqhcWgvw2YgZDYadliXkl14pa3WXw5jlCQ==}
 
+  '@types/json-bigint@1.0.4':
+    resolution: {integrity: sha512-ydHooXLbOmxBbubnA7Eh+RpBzuaIiQjh8WGJYQB50JFGFrdxW7JzVlyEV7fAXw0T2sqJ1ysTneJbiyNLqZRAag==}
+
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
@@ -1606,6 +1615,9 @@ packages:
   baseline-browser-mapping@2.8.20:
     resolution: {integrity: sha512-JMWsdF+O8Orq3EMukbUN1QfbLK9mX2CkUmQBcW2T0s8OmdAUL5LLM/6wFwSrqXzlXB13yhyK9gTKS1rIizOduQ==}
     hasBin: true
+
+  bignumber.js@9.3.1:
+    resolution: {integrity: sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==}
 
   birpc@2.6.1:
     resolution: {integrity: sha512-LPnFhlDpdSH6FJhJyn4M0kFO7vtQ5iPw24FnG0y21q09xC7e8+1LeR31S1MAIrDAHp4m7aas4bEkTDTvMAtebQ==}
@@ -2434,6 +2446,9 @@ packages:
     resolution: {integrity: sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA==}
     engines: {node: '>=6'}
     hasBin: true
+
+  json-bigint@1.0.0:
+    resolution: {integrity: sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==}
 
   json-buffer@3.0.1:
     resolution: {integrity: sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==}
@@ -4762,6 +4777,8 @@ snapshots:
 
   '@types/js-cookie@3.0.6': {}
 
+  '@types/json-bigint@1.0.4': {}
+
   '@types/json-schema@7.0.15': {}
 
   '@types/lodash-es@4.17.12':
@@ -5159,6 +5176,8 @@ snapshots:
   balanced-match@2.0.0: {}
 
   baseline-browser-mapping@2.8.20: {}
+
+  bignumber.js@9.3.1: {}
 
   birpc@2.6.1: {}
 
@@ -6063,6 +6082,10 @@ snapshots:
       argparse: 2.0.1
 
   jsesc@3.1.0: {}
+
+  json-bigint@1.0.0:
+    dependencies:
+      bignumber.js: 9.3.1
 
   json-buffer@3.0.1: {}
 
