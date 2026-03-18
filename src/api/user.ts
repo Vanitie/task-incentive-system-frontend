@@ -1,5 +1,11 @@
 import { http } from "@/utils/http";
 
+type BackendApiResponse<T> = {
+  code: number;
+  msg: string;
+  data: T;
+};
+
 export type UserResult = {
   success: boolean;
   data: {
@@ -36,7 +42,27 @@ export type RefreshTokenResult = {
 
 /** 登录 */
 export const getLogin = (data?: object) => {
-  return http.request<UserResult>("post", "/login", { data });
+  return http
+    .request<BackendApiResponse<{ token: string }>>("post", "/api/auth/login", {
+      data
+    })
+    .then(res => {
+      const username = (data as any)?.username ?? "";
+      const token = res?.data?.token ?? "";
+      return {
+        success: res?.code === 0,
+        data: {
+          avatar: "",
+          username,
+          nickname: username,
+          roles: ["admin"],
+          permissions: ["*:*:*"],
+          accessToken: token,
+          refreshToken: token,
+          expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      } as UserResult;
+    });
 };
 
 /** 刷新`token` */

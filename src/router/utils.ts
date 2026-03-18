@@ -198,28 +198,50 @@ function handleAsyncRoutes(routeList) {
 
 /** 初始化路由（`new Promise` 写法防止在异步请求中造成无限循环）*/
 function initRouter() {
+  const normalizeAsyncRouteList = (response: any) => {
+    const list =
+      response?.data?.data ?? response?.data ?? response?.result?.data ?? [];
+    return Array.isArray(list) ? list : [];
+  };
+
+  const sanitizeAsyncRouteList = (list: any[]) => {
+    return list.filter(item => item && typeof item === "object");
+  };
+
+  const safeCloneRouteList = (list: any[]) => {
+    const sanitized = sanitizeAsyncRouteList(list);
+    try {
+      return JSON.parse(JSON.stringify(sanitized));
+    } catch {
+      return sanitized.map(item => ({ ...item }));
+    }
+  };
+
   if (getConfig()?.CachingAsyncRoutes) {
     // 开启动态路由缓存本地localStorage
     const key = "async-routes";
     const asyncRouteList = storageLocal().getItem(key) as any;
-    if (asyncRouteList && asyncRouteList?.length > 0) {
+    if (Array.isArray(asyncRouteList) && asyncRouteList.length > 0) {
       return new Promise(resolve => {
-        handleAsyncRoutes(asyncRouteList);
+        handleAsyncRoutes(safeCloneRouteList(asyncRouteList));
         resolve(router);
       });
     } else {
       return new Promise(resolve => {
-        getAsyncRoutes().then(({ data }) => {
-          handleAsyncRoutes(cloneDeep(data));
-          storageLocal().setItem(key, data);
+        getAsyncRoutes().then(response => {
+          const routeList = normalizeAsyncRouteList(response);
+          const safeRouteList = safeCloneRouteList(routeList);
+          handleAsyncRoutes(safeRouteList);
+          storageLocal().setItem(key, safeRouteList);
           resolve(router);
         });
       });
     }
   } else {
     return new Promise(resolve => {
-      getAsyncRoutes().then(({ data }) => {
-        handleAsyncRoutes(cloneDeep(data));
+      getAsyncRoutes().then(response => {
+        const routeList = normalizeAsyncRouteList(response);
+        handleAsyncRoutes(safeCloneRouteList(routeList));
         resolve(router);
       });
     });

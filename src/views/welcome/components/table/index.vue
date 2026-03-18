@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { useColumns } from "./columns";
 import { useRenderIcon } from "@/components/ReIcon/src/hooks";
-
+import { toRef } from "vue";
+const props = defineProps<{ data: any[] }>();
 const { loading, columns, dataList, pagination, Empty, onCurrentChange } =
-  useColumns();
+  useColumns(toRef(props, "data"));
 </script>
 
 <template>
   <pure-table
-    row-key="id"
+    row-key="statDate"
     alignWhole="center"
     showOverflowTooltip
     :loading="loading"

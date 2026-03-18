@@ -6,7 +6,7 @@ import Smile from "~icons/ri/star-smile-line";
 
 const days = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
-/** 需求人数、提问数量、解决数量、用户满意度 */
+/** 用户总数、活跃用户数、今日参与任务用户数、今日奖励领取用户数 */
 const chartData = [
   {
     icon: GroupLine,
@@ -40,13 +40,13 @@ const chartData = [
   },
   {
     icon: Smile,
-    bgColor: "#f6f4fe",
-    color: "#7846e5",
-    duration: 100,
+    bgColor: "#fffbe6", // 新颜色
+    color: "#ffb300",
+    duration: 1800,
     name: "今日奖励领取用户数",
-    value: 100,
-    percent: "+100%",
-    data: [100]
+    value: 12345, // 随机生成
+    percent: "+95%",
+    data: [1200, 1500, 2100, 1800, 2200, 1700, 2045] // 随机生成
   }
 ];
 
@@ -112,11 +112,12 @@ const progressData = [
 const tableData = Array.from({ length: 30 }).map((_, index) => {
   return {
     id: index + 1,
-    requiredNumber: getRandomIntBetween(13500, 19999),
-    questionNumber: getRandomIntBetween(12600, 16999),
-    resolveNumber: getRandomIntBetween(13500, 17999),
-    satisfaction: getRandomIntBetween(95, 100),
-    date: dayjs().subtract(index, "day").format("YYYY-MM-DD")
+    statDate: dayjs().subtract(index, "day").format("YYYY-MM-DD"),
+    userTotal: getRandomIntBetween(13500, 19999),
+    activeUser: getRandomIntBetween(12600, 16999),
+    taskReceived: getRandomIntBetween(13500, 17999),
+    taskCompleted: getRandomIntBetween(95, 100),
+    completionRate: `${getRandomIntBetween(90, 100)}%`
   };
 });
 

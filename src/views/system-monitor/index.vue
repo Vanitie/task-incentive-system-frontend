@@ -5,25 +5,45 @@
       <el-col :span="6">
         <el-card>
           <div class="text-md font-bold mb-2">实时QPS</div>
-          <div class="text-2xl text-blue-600">{{ realtimeQps }}</div>
+          <div
+            class="text-2xl text-blue-600 metric-number"
+            :class="{ 'number-pop': numberAnimated }"
+          >
+            {{ realtimeQps }}
+          </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card>
           <div class="text-md font-bold mb-2">单日请求量</div>
-          <div class="text-2xl text-green-600">{{ dailyRequest }}</div>
+          <div
+            class="text-2xl text-green-600 metric-number"
+            :class="{ 'number-pop': numberAnimated }"
+          >
+            {{ dailyRequest }}
+          </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card>
           <div class="text-md font-bold mb-2">小时成功率</div>
-          <div class="text-2xl text-success">{{ hourlySuccessRate }}%</div>
+          <div
+            class="text-2xl text-success metric-number"
+            :class="{ 'number-pop': numberAnimated }"
+          >
+            {{ hourlySuccessRate }}%
+          </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card>
           <div class="text-md font-bold mb-2">小时失败率</div>
-          <div class="text-2xl text-danger">{{ hourlyFailRate }}%</div>
+          <div
+            class="text-2xl text-danger metric-number"
+            :class="{ 'number-pop': numberAnimated }"
+          >
+            {{ hourlyFailRate }}%
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -68,45 +88,31 @@
   </div>
 </template>
 <script setup>
-import { ref } from "vue";
-import ReFlop from "@/components/ReFlop";
-import ReFlowChart from "@/components/ReFlowChart";
+import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import ReTrendChart from "@/components/ReTrendChart.vue";
+import {
+  getQps,
+  getRequestCount,
+  getHourSuccessRate,
+  getHourFailureRate,
+  getTpSeriesLast20min,
+  getResourceSeries
+} from "@/api/monitor";
 
 // 顶部核心指标
-const realtimeQps = ref(320);
-const dailyRequest = ref(123456);
-const hourlySuccessRate = ref(98.7);
-const hourlyFailRate = ref(1.3);
+const realtimeQps = ref(0);
+const dailyRequest = ref(0);
+const hourlySuccessRate = ref(0);
+const hourlyFailRate = ref(0);
+const numberAnimated = ref(false);
+let pollingTimer = null;
+let animationTimer = null;
+let isPolling = false;
 
 // 响应时间分布（分钟级模拟数据，折线图，含图例）
 const responseLineChartData = ref({
-  xAxis: [
-    "10:00",
-    "10:01",
-    "10:02",
-    "10:03",
-    "10:04",
-    "10:05",
-    "10:06",
-    "10:07",
-    "10:08",
-    "10:09"
-  ],
-  series: [
-    {
-      name: "tp90",
-      data: [120, 110, 130, 125, 115, 140, 135, 128, 132, 138]
-    },
-    {
-      name: "tp95",
-      data: [180, 170, 190, 185, 175, 200, 195, 188, 192, 198]
-    },
-    {
-      name: "tp99",
-      data: [250, 240, 260, 255, 245, 270, 265, 258, 262, 268]
-    }
-  ]
+  xAxis: [],
+  series: []
 });
 
 // 服务器资源监控（新增服务器名称列）
@@ -117,22 +123,7 @@ const resourceColumns = [
   { prop: "disk", label: "磁盘使用率" },
   { prop: "timestamp", label: "时间" }
 ];
-const resourceData = ref([
-  {
-    server: "server-01",
-    cpu: "45%",
-    memory: "60%",
-    disk: "70%",
-    timestamp: "2026-03-15 10:00"
-  },
-  {
-    server: "server-02",
-    cpu: "50%",
-    memory: "65%",
-    disk: "72%",
-    timestamp: "2026-03-15 10:05"
-  }
-]);
+const resourceData = ref([]);
 
 // 压测模块
 const pressureColumns = [
@@ -164,4 +155,106 @@ function runPressure() {
     duration: pressureParams.value.duration + "s"
   });
 }
+
+function unwrapData(response) {
+  const payload = response?.data;
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return payload.data;
+  }
+  return payload;
+}
+
+function triggerRefreshAnimation() {
+  numberAnimated.value = false;
+  nextTick(() => {
+    numberAnimated.value = true;
+  });
+  if (animationTimer) clearTimeout(animationTimer);
+  animationTimer = setTimeout(() => {
+    numberAnimated.value = false;
+  }, 550);
+}
+
+async function fetchMonitorData() {
+  if (isPolling) return;
+  isPolling = true;
+  try {
+    const [qpsRes, requestRes, successRes, failRes, tpRes, resourceRes] =
+      await Promise.allSettled([
+        getQps(),
+        getRequestCount(),
+        getHourSuccessRate(),
+        getHourFailureRate(),
+        getTpSeriesLast20min(),
+        getResourceSeries()
+      ]);
+
+    if (qpsRes.status === "fulfilled") {
+      realtimeQps.value = Number(unwrapData(qpsRes.value) ?? 0);
+    }
+    if (requestRes.status === "fulfilled") {
+      dailyRequest.value = Number(unwrapData(requestRes.value) ?? 0);
+    }
+    if (successRes.status === "fulfilled") {
+      hourlySuccessRate.value = Number(unwrapData(successRes.value) ?? 0);
+    }
+    if (failRes.status === "fulfilled") {
+      hourlyFailRate.value = Number(unwrapData(failRes.value) ?? 0);
+    }
+    if (tpRes.status === "fulfilled") {
+      const tpData = unwrapData(tpRes.value) || {};
+      responseLineChartData.value = {
+        xAxis: Array.isArray(tpData.xAxis) ? tpData.xAxis : [],
+        series: Array.isArray(tpData.series) ? tpData.series : []
+      };
+    }
+    if (resourceRes.status === "fulfilled") {
+      const resources = unwrapData(resourceRes.value);
+      resourceData.value = Array.isArray(resources) ? resources : [];
+    }
+
+    triggerRefreshAnimation();
+  } finally {
+    isPolling = false;
+  }
+}
+
+onMounted(() => {
+  fetchMonitorData();
+  pollingTimer = setInterval(fetchMonitorData, 1000);
+});
+
+onUnmounted(() => {
+  if (pollingTimer) clearInterval(pollingTimer);
+  if (animationTimer) clearTimeout(animationTimer);
+});
 </script>
+
+<style scoped>
+.metric-number {
+  transition:
+    transform 0.28s ease,
+    opacity 0.28s ease;
+}
+
+.number-pop {
+  animation: numberPulse 0.45s ease;
+}
+
+@keyframes numberPulse {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.97);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+</style>

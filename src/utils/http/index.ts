@@ -3,6 +3,7 @@ import Axios, {
   type AxiosRequestConfig,
   type CustomParamsSerializer
 } from "axios";
+import JSONBig from "json-bigint";
 import type {
   PureHttpError,
   RequestMethods,
@@ -13,6 +14,8 @@ import { stringify } from "qs";
 import { getToken, formatToken } from "@/utils/auth";
 import { useUserStoreHook } from "@/store/modules/user";
 
+const jsonBigParser = JSONBig({ storeAsString: true });
+
 // 相关配置请参考：www.axios-js.com/zh-cn/docs/#axios-request-config-1
 const defaultConfig: AxiosRequestConfig = {
   // 请求超时时间
@@ -22,6 +25,31 @@ const defaultConfig: AxiosRequestConfig = {
     "Content-Type": "application/json",
     "X-Requested-With": "XMLHttpRequest"
   },
+  transformResponse: [
+    (data, headers) => {
+      if (typeof data !== "string") return data;
+
+      const contentType =
+        (headers?.["content-type"] as string) ||
+        (headers?.["Content-Type"] as string) ||
+        "";
+      const trimmedData = data.trim();
+
+      if (!trimmedData) return data;
+
+      const looksLikeJson =
+        trimmedData.startsWith("{") || trimmedData.startsWith("[");
+      if (!contentType.includes("application/json") && !looksLikeJson) {
+        return data;
+      }
+
+      try {
+        return jsonBigParser.parse(trimmedData);
+      } catch {
+        return data;
+      }
+    }
+  ],
   // 数组格式参数序列化（https://github.com/axios/axios/issues/5142）
   paramsSerializer: {
     serialize: stringify as unknown as CustomParamsSerializer

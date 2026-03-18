@@ -1,36 +1,179 @@
 <script setup lang="ts">
-import { ref, markRaw } from "vue";
+import GroupLine from "~icons/ri/group-line";
+import Question from "~icons/ri/question-answer-line";
+import CheckLine from "~icons/ri/chat-check-line";
+import Smile from "~icons/ri/star-smile-line";
+
+const iconMap = {
+  user: GroupLine,
+  active: Question,
+  task: CheckLine,
+  reward: Smile
+};
+import { ref, markRaw, onMounted } from "vue";
 import ReCol from "@/components/ReCol";
 import { useDark, randomGradient } from "./utils";
-import WelcomeTable from "./components/table/index.vue";
 import { ReNormalCountTo } from "@/components/ReCountTo";
 import { useRenderFlicker } from "@/components/ReFlicker";
 import { ChartBar, ChartLine, ChartRound } from "./components/charts";
+import WelcomeTable from "./components/table/index.vue";
 import Segmented, { type OptionsType } from "@/components/ReSegmented";
-import { chartData, barChartData, progressData, latestNewsData } from "./data";
+import {
+  getUserTotal,
+  getActive7Days,
+  getTodayUserCount,
+  getTodayRewardReceivers,
+  getDailyTaskBar,
+  getWeeklyCompletion,
+  getDailyStats
+} from "@/api/welcome";
 
 defineOptions({
   name: "Welcome"
 });
 
 const { isDark } = useDark();
-
 let curWeek = ref(1); // 0上周、1本周
-const optionsBasis: Array<OptionsType> = [
+const optionsBasis: Array<OptionsType> = [{ label: "上周" }, { label: "本周" }];
+
+// 顶部统计卡片数据
+const statCards = ref([
   {
-    label: "上周"
+    name: "用户总数",
+    value: 0,
+    percent: "",
+    icon: undefined,
+    bgColor: "#effaff",
+    color: "#41b6ff",
+    duration: 2200,
+    data: []
   },
   {
-    label: "本周"
+    name: "活跃用户数",
+    value: 0,
+    percent: "",
+    icon: undefined,
+    bgColor: "#fff5f4",
+    color: "#e85f33",
+    duration: 1600,
+    data: []
+  },
+  {
+    name: "今日参与任务用户数",
+    value: 0,
+    percent: "",
+    icon: undefined,
+    bgColor: "#eff8f4",
+    color: "#26ce83",
+    duration: 1500,
+    data: []
+  },
+  {
+    name: "今日奖励领取用户数",
+    value: 0,
+    percent: "",
+    icon: undefined,
+    bgColor: "#fffbe6",
+    color: "#ffb300",
+    duration: 1800,
+    data: []
   }
-];
+]);
+
+// 单日任务完成数
+const barChartData = ref([
+  { takeData: [], completeData: [] },
+  { takeData: [], completeData: [] }
+]);
+// 任务完成率
+const progressData = ref([]);
+// 数据统计表格
+const tableData = ref([]);
+// 最新动态
+const latestNewsData = ref([]);
+
+onMounted(async () => {
+  // 顶部统计卡片
+  const [userTotal, active7, todayUser, todayReward] = await Promise.all([
+    getUserTotal(),
+    getActive7Days(),
+    getTodayUserCount(),
+    getTodayRewardReceivers()
+  ]);
+  // 自动补充icon语义
+  statCards.value[0] = { ...userTotal.data, icon: iconMap.user };
+  statCards.value[1] = { ...active7.data, icon: iconMap.active };
+  statCards.value[2] = { ...todayUser.data, icon: iconMap.task };
+  statCards.value[3] = { ...todayReward.data, icon: iconMap.reward };
+
+  // 单日任务完成数
+  const dailyBar = await getDailyTaskBar();
+  // 假设后端返回两周数据，前一周后一周分组
+  const barArr =
+    dailyBar.data &&
+    typeof dailyBar.data === "object" &&
+    "records" in dailyBar.data &&
+    Array.isArray((dailyBar.data as any).records)
+      ? (dailyBar.data as any).records
+      : dailyBar.data;
+  if (Array.isArray(barArr)) {
+    // 顺序调整：本周在前，上周在后
+    barChartData.value = [
+      {
+        takeData: barArr[1]?.taskReceived || [],
+        completeData: barArr[1]?.taskCompleted || []
+      },
+      {
+        takeData: barArr[0]?.taskReceived || [],
+        completeData: barArr[0]?.taskCompleted || []
+      }
+    ];
+  }
+
+  // 任务完成率
+  const weekly = await getWeeklyCompletion();
+  const weekArr =
+    weekly.data &&
+    typeof weekly.data === "object" &&
+    "records" in weekly.data &&
+    Array.isArray((weekly.data as any).records)
+      ? (weekly.data as any).records
+      : weekly.data;
+  if (Array.isArray(weekArr)) {
+    progressData.value = weekArr.map(item => ({
+      week: item.week || item.date,
+      percentage:
+        item.percentage ?? Math.round((item.completionRate ?? 0) * 100),
+      duration: item.duration ?? 100,
+      color: item.color || "#41b6ff"
+    }));
+  }
+
+  // 数据统计表格
+  const stats = await getDailyStats({ page: 1, size: 30 });
+  const tableArr =
+    stats.data &&
+    typeof stats.data === "object" &&
+    "records" in stats.data &&
+    Array.isArray((stats.data as any).records)
+      ? (stats.data as any).records
+      : stats.data;
+  if (Array.isArray(tableArr)) {
+    tableData.value = tableArr;
+    // 最新动态可用表格数据部分字段
+    latestNewsData.value = tableArr.slice(0, 14).map((item, idx) => ({
+      ...item,
+      date: item.statDate || item.date
+    }));
+  }
+});
 </script>
 
 <template>
   <div>
     <el-row :gutter="24" justify="space-around">
       <re-col
-        v-for="(item, index) in chartData"
+        v-for="(item, index) in statCards"
         :key="index"
         v-motion
         class="mb-4.5"
@@ -114,8 +257,8 @@ const optionsBasis: Array<OptionsType> = [
           </div>
           <div class="flex justify-between items-start mt-3">
             <ChartBar
-              :requireData="barChartData[curWeek].requireData"
-              :questionData="barChartData[curWeek].questionData"
+              :takeData="barChartData[curWeek]?.takeData || []"
+              :completeData="barChartData[curWeek]?.completeData || []"
             />
           </div>
         </el-card>
@@ -190,7 +333,7 @@ const optionsBasis: Array<OptionsType> = [
             <span class="text-md font-medium">数据统计</span>
           </div>
           <el-scrollbar max-height="504" class="mt-3">
-            <WelcomeTable />
+            <WelcomeTable :data="tableData" />
           </el-scrollbar>
         </el-card>
       </re-col>

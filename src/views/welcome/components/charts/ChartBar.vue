@@ -3,11 +3,11 @@ import { useDark, useECharts } from "@pureadmin/utils";
 import { type PropType, ref, computed, watch, nextTick } from "vue";
 
 const props = defineProps({
-  requireData: {
+  takeData: {
     type: Array as PropType<Array<number>>,
     default: () => []
   },
-  questionData: {
+  completeData: {
     type: Array as PropType<Array<number>>,
     default: () => []
   }
@@ -41,7 +41,7 @@ watch(
         right: 0
       },
       legend: {
-        data: ["需求人数", "提问数量"],
+        data: ["接取任务数", "完成任务数"],
         textStyle: {
           color: "#606266",
           fontSize: "0.875rem"
@@ -74,24 +74,24 @@ watch(
       ],
       series: [
         {
-          name: "需求人数",
+          name: "接取任务数",
           type: "bar",
           barWidth: 10,
           itemStyle: {
             color: "#41b6ff",
             borderRadius: [10, 10, 0, 0]
           },
-          data: props.requireData
+          data: props.takeData
         },
         {
-          name: "提问数量",
+          name: "完成任务数",
           type: "bar",
           barWidth: 10,
           itemStyle: {
             color: "#e86033ce",
             borderRadius: [10, 10, 0, 0]
           },
-          data: props.questionData
+          data: props.completeData
         }
       ]
     });

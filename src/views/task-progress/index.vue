@@ -49,6 +49,18 @@
           </template>
         </el-table-column>
       </el-table>
+      <div style="margin-top: 16px; text-align: right">
+        <el-pagination
+          background
+          layout="sizes, prev, pager, next, jumper, ->, total"
+          :current-page="page"
+          :page-size="size"
+          :page-sizes="pageSizes"
+          :total="total"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
     <el-dialog v-model="dialogVisible" title="任务详情" width="400px">
       <el-descriptions :column="1">
@@ -86,7 +98,13 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+const pageSizes = [10, 20, 50, 100];
 
+function handleSizeChange(newSize: number) {
+  size.value = newSize;
+  page.value = 1;
+  fetchData();
+}
 interface UserTaskInstanceForm {
   id: number;
   userId: number;
@@ -99,8 +117,13 @@ interface UserTaskInstanceForm {
   updateTime: string | Date;
 }
 
+import { getUserTaskList } from "@/api/user-task";
+
 const search = ref({ userId: "", taskId: "", status: "" });
 const tableData = ref([]);
+const page = ref(1);
+const size = ref(20);
+const total = ref(0);
 const dialogVisible = ref(false);
 const detail = ref<UserTaskInstanceForm>({
   id: 0,
@@ -114,11 +137,29 @@ const detail = ref<UserTaskInstanceForm>({
   updateTime: ""
 });
 
-function fetchData() {
-  // TODO: 调用后端API获取数据
+async function fetchData() {
+  const params: any = {};
+  if (search.value.userId) params.userId = search.value.userId;
+  if (search.value.taskId) params.taskId = search.value.taskId;
+  if (search.value.status) params.status = search.value.status;
+  params.page = page.value;
+  params.size = size.value;
+  const res = await getUserTaskList(params);
+  const r = res as any;
+  const items = r?.data?.data?.items || r?.data?.items || [];
+  tableData.value = items;
+  total.value = r?.data?.data?.total || r?.data?.total || 0;
 }
+
+function handlePageChange(newPage: number) {
+  page.value = newPage;
+  fetchData();
+}
+
 function showDetail(row: any) {
   detail.value = { ...row };
   dialogVisible.value = true;
 }
+
+fetchData();
 </script>

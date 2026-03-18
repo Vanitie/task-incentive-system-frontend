@@ -1,61 +1,48 @@
-import { tableData } from "../../data";
 import { delay } from "@pureadmin/utils";
-import { ref, onMounted, reactive } from "vue";
+import { ref, watch, reactive } from "vue";
+import type { Ref } from "vue";
 import type { PaginationProps } from "@pureadmin/table";
-import ThumbUp from "~icons/ri/thumb-up-line";
-import Hearts from "~icons/ri/hearts-line";
+// import ThumbUp from "~icons/ri/thumb-up-line";
+// import Hearts from "~icons/ri/hearts-line";
 import Empty from "./empty.svg?component";
 
-export function useColumns() {
-  const dataList = ref([]);
-  const loading = ref(true);
+export function useColumns(propsData: Ref<any[]>) {
+  const dataList = ref<any[]>([]);
+  const loading = ref(false);
   const columns: TableColumnList = [
     {
       sortable: true,
       label: "统计日期",
-      prop: "date"
+      prop: "statDate"
     },
     {
       sortable: true,
       label: "用户总数",
-      prop: "requiredNumber",
+      prop: "userTotal",
       filterMultiple: false,
       filterClassName: "pure-table-filter",
       filters: [
         { text: "≥16000", value: "more" },
         { text: "<16000", value: "less" }
       ],
-      filterMethod: (value, { requiredNumber }) => {
-        return value === "more"
-          ? requiredNumber >= 16000
-          : requiredNumber < 16000;
+      filterMethod: (value, { userTotal }) => {
+        return value === "more" ? userTotal >= 16000 : userTotal < 16000;
       }
     },
     {
       sortable: true,
       label: "活跃用户数",
-      prop: "questionNumber"
+      prop: "activeUser"
     },
     {
       sortable: true,
       label: "领取任务数",
-      prop: "resolveNumber"
+      prop: "taskReceived"
     },
     {
       sortable: true,
       label: "完成任务数",
-      prop: "satisfaction",
-      cellRenderer: ({ row }) => (
-        <div class="flex justify-center w-full">
-          <span class="flex items-center w-15">
-            <span class="ml-auto mr-2">{row.satisfaction}%</span>
-            <iconifyIconOffline
-              icon={row.satisfaction > 98 ? Hearts : ThumbUp}
-              color="#e85f33"
-            />
-          </span>
-        </div>
-      )
+      prop: "taskCompleted"
     },
     {
       sortable: true,
@@ -87,11 +74,14 @@ export function useColumns() {
     });
   }
 
-  onMounted(() => {
-    dataList.value = tableData;
-    pagination.total = dataList.value.length;
-    loading.value = false;
-  });
+  watch(
+    propsData,
+    val => {
+      dataList.value = Array.isArray(val) ? val : [];
+      pagination.total = dataList.value.length;
+    },
+    { immediate: true }
+  );
 
   return {
     Empty,
