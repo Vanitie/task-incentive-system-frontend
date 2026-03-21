@@ -17,6 +17,28 @@
             placeholder="例如 10001"
           />
         </el-form-item>
+        <el-form-item label="资源类型">
+          <el-select
+            v-model="query.resourceType"
+            clearable
+            style="width: 160px"
+            placeholder="请选择"
+          >
+            <el-option
+              v-for="item in resourceTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="资源ID">
+          <el-input
+            v-model="query.resourceId"
+            clearable
+            placeholder="例如 20001"
+          />
+        </el-form-item>
         <el-form-item label="周期类型">
           <el-select v-model="query.periodType" clearable style="width: 160px">
             <el-option label="分钟(minute)" value="minute" />
@@ -37,10 +59,13 @@
         <el-table-column prop="id" label="ID" width="100" />
         <el-table-column prop="scopeType" label="作用域类型" width="130" />
         <el-table-column prop="scopeId" label="作用域ID" min-width="140" />
+        <el-table-column prop="resourceType" label="资源类型" min-width="130" />
+        <el-table-column prop="resourceId" label="资源ID" min-width="140" />
         <el-table-column prop="periodType" label="周期类型" width="120" />
         <el-table-column prop="limitValue" label="限制值" min-width="120" />
         <el-table-column prop="usedValue" label="已使用" min-width="120" />
         <el-table-column prop="resetAt" label="重置时间" min-width="180" />
+        <el-table-column prop="createdAt" label="创建时间" min-width="180" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
             <el-button size="small" type="primary" @click="openEdit(scope.row)">
@@ -69,13 +94,44 @@
       />
     </el-card>
 
-    <el-dialog v-model="dialogVisible" title="修改配额使用值" width="460px">
+    <el-dialog v-model="dialogVisible" title="修改配额" width="560px">
       <el-form :model="editForm" label-width="100px">
         <el-form-item label="配额ID">
           <el-input :model-value="String(editForm.id || '')" readonly />
         </el-form-item>
-        <el-form-item label="已使用值">
-          <el-input-number v-model="editForm.usedValue" :min="0" :step="1" />
+        <el-form-item label="作用域类型">
+          <el-select v-model="editForm.scopeType" style="width: 220px">
+            <el-option label="用户(user)" value="user" />
+            <el-option label="任务(task)" value="task" />
+            <el-option label="活动(activity)" value="activity" />
+            <el-option label="全局(global)" value="global" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="作用域ID">
+          <el-input v-model="editForm.scopeId" placeholder="例如 10001" />
+        </el-form-item>
+        <el-form-item label="资源类型">
+          <el-select v-model="editForm.resourceType" style="width: 220px">
+            <el-option
+              v-for="item in resourceTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="资源ID">
+          <el-input v-model="editForm.resourceId" placeholder="例如 20001" />
+        </el-form-item>
+        <el-form-item label="周期类型">
+          <el-select v-model="editForm.periodType" style="width: 220px">
+            <el-option label="分钟(minute)" value="minute" />
+            <el-option label="小时(hour)" value="hour" />
+            <el-option label="天(day)" value="day" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="限制值">
+          <el-input-number v-model="editForm.limitValue" :min="0" :step="1" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -99,6 +155,19 @@
         <el-form-item label="作用域ID">
           <el-input v-model="createForm.scopeId" placeholder="例如 10001" />
         </el-form-item>
+        <el-form-item label="资源类型">
+          <el-select v-model="createForm.resourceType" style="width: 220px">
+            <el-option
+              v-for="item in resourceTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="资源ID">
+          <el-input v-model="createForm.resourceId" placeholder="例如 20001" />
+        </el-form-item>
         <el-form-item label="周期类型">
           <el-select v-model="createForm.periodType" style="width: 220px">
             <el-option label="分钟(minute)" value="minute" />
@@ -108,18 +177,6 @@
         </el-form-item>
         <el-form-item label="限制值">
           <el-input-number v-model="createForm.limitValue" :min="0" :step="1" />
-        </el-form-item>
-        <el-form-item label="已使用值">
-          <el-input-number v-model="createForm.usedValue" :min="0" :step="1" />
-        </el-form-item>
-        <el-form-item label="重置时间">
-          <el-date-picker
-            v-model="createForm.resetAt"
-            type="datetime"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            placeholder="可选"
-            style="width: 100%"
-          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -150,9 +207,18 @@ const creating = ref(false);
 const dialogVisible = ref(false);
 const createDialogVisible = ref(false);
 
+const resourceTypeOptions = [
+  { label: "积分(POINT)", value: "POINT" },
+  { label: "徽章(BADGE)", value: "BADGE" },
+  { label: "实物(PHYSICAL)", value: "PHYSICAL" },
+  { label: "全部(ALL)", value: "ALL" }
+];
+
 const query = ref<{
   scopeType?: string;
   scopeId?: string;
+  resourceType?: string;
+  resourceId?: string;
   periodType?: string;
 }>({});
 
@@ -164,18 +230,23 @@ const page = ref({
 
 const tableData = ref<RiskQuotaItem[]>([]);
 
-const editForm = ref<{ id?: string | number; usedValue: number }>({
+const editForm = ref<RiskQuotaRequest>({
   id: undefined,
-  usedValue: 0
+  scopeType: "user",
+  scopeId: "",
+  resourceType: "ALL",
+  resourceId: "",
+  periodType: "day",
+  limitValue: 0
 });
 
 const createForm = ref<RiskQuotaRequest>({
   scopeType: "user",
   scopeId: "",
+  resourceType: "ALL",
+  resourceId: "",
   periodType: "day",
-  limitValue: 0,
-  usedValue: 0,
-  resetAt: ""
+  limitValue: 0
 });
 
 function unwrapData<T>(payload: T | { data?: T }): T {
@@ -193,6 +264,8 @@ async function fetchData() {
       size: page.value.size,
       scopeType: query.value.scopeType,
       scopeId: query.value.scopeId,
+      resourceType: query.value.resourceType,
+      resourceId: query.value.resourceId,
       periodType: query.value.periodType
     });
     const data = unwrapData(response);
@@ -214,7 +287,12 @@ function resetQuery() {
 function openEdit(row: RiskQuotaItem) {
   editForm.value = {
     id: row.id,
-    usedValue: Number(row.usedValue || 0)
+    scopeType: row.scopeType,
+    scopeId: row.scopeId,
+    resourceType: row.resourceType || "",
+    resourceId: row.resourceId || "",
+    periodType: row.periodType,
+    limitValue: Number(row.limitValue || 0)
   };
   dialogVisible.value = true;
 }
@@ -223,10 +301,10 @@ function openCreateDialog() {
   createForm.value = {
     scopeType: "user",
     scopeId: "",
+    resourceType: "ALL",
+    resourceId: "",
     periodType: "day",
-    limitValue: 0,
-    usedValue: 0,
-    resetAt: ""
+    limitValue: 0
   };
   createDialogVisible.value = true;
 }
@@ -235,9 +313,11 @@ async function submitCreate() {
   if (
     !createForm.value.scopeType ||
     !createForm.value.scopeId ||
+    !createForm.value.resourceType ||
+    !createForm.value.resourceId ||
     !createForm.value.periodType
   ) {
-    ElMessage.warning("请先填写作用域类型、作用域ID和周期类型");
+    ElMessage.warning("请先填写作用域、资源和周期相关字段");
     return;
   }
 
@@ -275,17 +355,21 @@ async function handleDelete(row: RiskQuotaItem) {
 }
 
 async function submitEdit() {
-  if (editForm.value.id === undefined) {
-    ElMessage.warning("缺少配额ID");
+  if (
+    editForm.value.id === undefined ||
+    !editForm.value.scopeType ||
+    !editForm.value.scopeId ||
+    !editForm.value.resourceType ||
+    !editForm.value.resourceId ||
+    !editForm.value.periodType
+  ) {
+    ElMessage.warning("请先完善配额字段");
     return;
   }
 
   updating.value = true;
   try {
-    await updateRiskQuota({
-      id: editForm.value.id,
-      usedValue: Number(editForm.value.usedValue || 0)
-    });
+    await updateRiskQuota(editForm.value);
     ElMessage.success("配额更新成功");
     dialogVisible.value = false;
     fetchData();

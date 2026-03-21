@@ -8,9 +8,10 @@
           style="width: 200px; margin-right: 8px"
         />
         <el-button type="primary" @click="fetchData">搜索</el-button>
+        <el-button @click="resetSearch">重置</el-button>
         <el-button @click="openDialog">新增徽章</el-button>
       </el-row>
-      <el-table :data="tableData" style="margin-top: 16px">
+      <el-table v-loading="loading" :data="tableData" style="margin-top: 16px">
         <el-table-column prop="id" label="徽章ID" width="80" />
         <el-table-column prop="name" label="徽章名称" />
         <el-table-column prop="code" label="徽章标识" />
@@ -40,6 +41,16 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-pagination
+        v-model:current-page="page.current"
+        v-model:page-size="page.size"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="page.total"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 16px; justify-content: flex-end"
+        @current-change="fetchData"
+        @size-change="handleSizeChange"
+      />
     </el-card>
     <el-dialog v-model="dialogVisible" title="徽章管理" width="500px">
       <el-form :model="form">
@@ -65,45 +76,133 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import {
+  createBadge,
+  deleteBadge as deleteBadgeApi,
+  getBadgeList,
+  searchBadgeByName,
+  updateBadge,
+  type BadgeItem
+} from "@/api/badge";
 
 const search = ref({ name: "" });
-const tableData = ref([
-  {
-    id: 1,
-    name: "学习达人",
-    code: 1001,
-    imageUrl: "https://example.com/badge1.png",
-    description: "完成100次学习任务获得",
-    createTime: "2026-03-17 10:00:00",
-    updateTime: "2026-03-17 10:00:00"
-  }
-]);
+const loading = ref(false);
+const tableData = ref<BadgeItem[]>([]);
+const page = ref({
+  current: 1,
+  size: 20,
+  total: 0
+});
 const dialogVisible = ref(false);
 const form = ref({
-  id: null,
+  id: undefined as number | undefined,
   name: "",
   code: 0,
   imageUrl: "",
   description: ""
 });
 
-function fetchData() {
-  // TODO: 调用后端API获取数据
+function unwrapData<T>(payload: T | { data?: T }): T {
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return ((payload as { data?: T }).data ?? payload) as T;
+  }
+  return payload as T;
 }
+
+async function fetchData() {
+  loading.value = true;
+  try {
+    const params = {
+      page: page.value.current,
+      size: page.value.size
+    };
+    const response = search.value.name.trim()
+      ? await searchBadgeByName({ ...params, name: search.value.name.trim() })
+      : await getBadgeList(params);
+    const data = unwrapData(response);
+    tableData.value = data?.items || [];
+    page.value.total = Number(data?.total || 0);
+  } catch {
+    ElMessage.error("加载徽章列表失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+function resetSearch() {
+  search.value.name = "";
+  page.value.current = 1;
+  fetchData();
+}
+
+function handleSizeChange() {
+  page.value.current = 1;
+  fetchData();
+}
+
 function openDialog() {
-  form.value = { id: null, name: "", code: 0, imageUrl: "", description: "" };
+  form.value = {
+    id: undefined,
+    name: "",
+    code: 0,
+    imageUrl: "",
+    description: ""
+  };
   dialogVisible.value = true;
 }
 function editBadge(row: any) {
   form.value = { ...row };
   dialogVisible.value = true;
 }
-function deleteBadge(id: number) {
-  // TODO: 调用后端API删除
+
+async function deleteBadge(id: number) {
+  try {
+    await ElMessageBox.confirm("确认删除该徽章吗？", "删除确认", {
+      type: "warning",
+      confirmButtonText: "确认",
+      cancelButtonText: "取消"
+    });
+    await deleteBadgeApi(id);
+    ElMessage.success("删除成功");
+    if (tableData.value.length === 1 && page.value.current > 1) {
+      page.value.current -= 1;
+    }
+    fetchData();
+  } catch {
+    // 用户取消或请求失败
+  }
 }
-function submitForm() {
-  // TODO: 调用后端API保存
-  dialogVisible.value = false;
+
+async function submitForm() {
+  if (!form.value.name.trim()) {
+    ElMessage.warning("请填写徽章名称");
+    return;
+  }
+
+  try {
+    const payload: BadgeItem = {
+      ...(form.value.id ? { id: form.value.id } : {}),
+      name: form.value.name.trim(),
+      code: Number(form.value.code || 0),
+      imageUrl: form.value.imageUrl?.trim() || "",
+      description: form.value.description?.trim() || ""
+    };
+
+    if (form.value.id) {
+      await updateBadge(payload);
+      ElMessage.success("更新成功");
+    } else {
+      await createBadge(payload);
+      ElMessage.success("新增成功");
+    }
+    dialogVisible.value = false;
+    fetchData();
+  } catch {
+    ElMessage.error(form.value.id ? "更新失败" : "新增失败");
+  }
 }
+
+onMounted(fetchData);
 </script>

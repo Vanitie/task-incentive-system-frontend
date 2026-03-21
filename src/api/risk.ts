@@ -123,20 +123,23 @@ export interface RiskQuotaItem {
   id: string | number;
   scopeType: string;
   scopeId: string;
+  resourceType?: string;
+  resourceId?: string;
   periodType: string;
   limitValue: number;
-  usedValue: number;
+  usedValue?: number;
   resetAt?: string;
+  createdAt?: string;
 }
 
 export interface RiskQuotaRequest {
   id?: string | number;
   scopeType: string;
   scopeId: string;
+  resourceType: string;
+  resourceId: string;
   periodType: string;
   limitValue: number;
-  usedValue: number;
-  resetAt?: string;
 }
 
 export function getRiskDashboardOverview(params?: {
@@ -270,6 +273,8 @@ export function getRiskQuotas(params?: {
   size?: number;
   scopeType?: string;
   scopeId?: string;
+  resourceType?: string;
+  resourceId?: string;
   periodType?: string;
 }) {
   return http.get<ApiResponse<PageData<RiskQuotaItem>>, typeof params>(
@@ -290,8 +295,13 @@ export function createRiskQuota(data: RiskQuotaRequest) {
 }
 
 export function updateRiskQuota(data: {
-  id: string | number;
-  usedValue: number;
+  id?: string | number;
+  scopeType: string;
+  scopeId: string;
+  resourceType: string;
+  resourceId: string;
+  periodType: string;
+  limitValue: number;
 }) {
   return http.request<ApiResponse<RiskQuotaItem>>("put", "/api/risk/quotas", {
     data
