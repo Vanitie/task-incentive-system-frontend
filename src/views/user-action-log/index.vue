@@ -38,7 +38,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="actionValue" label="行为数值" />
-        <el-table-column prop="createTime" label="行为发生时间" />
+        <el-table-column prop="createTime" label="行为发生时间">
+          <template #default="scope">
+            {{ formatDate(scope.row.createTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="180">
           <template #default="scope">
             <el-button size="small" @click="editLog(scope.row)">编辑</el-button>
@@ -51,6 +55,17 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-pagination
+        style="margin-top: 16px; text-align: right"
+        background
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        :current-page="page"
+        :page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
     </el-card>
     <el-dialog v-model="dialogVisible" title="用户行为日志" width="500px">
       <el-form :model="form">
@@ -81,6 +96,10 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import {
+  queryUserActionLog,
+  type UserActionLogItem
+} from "@/api/user-action-log";
 
 const actionTypeMap = {
   USER_LEARN: "学习",
@@ -88,24 +107,11 @@ const actionTypeMap = {
   OTHER: "其他"
 };
 
-const search = ref({ userId: "", actionType: "", dateRange: [] });
-const tableData = ref([
-  // 示例数据
-  {
-    id: 1,
-    userId: 1001,
-    actionType: "USER_LEARN",
-    actionValue: 30,
-    createTime: "2026-03-17 10:00:00"
-  },
-  {
-    id: 2,
-    userId: 1002,
-    actionType: "USER_SIGN",
-    actionValue: 1,
-    createTime: "2026-03-17 09:00:00"
-  }
-]);
+const search = ref({ userId: "", actionType: "", dateRange: [] as string[] });
+const tableData = ref<UserActionLogItem[]>([]);
+const total = ref(0);
+const page = ref(1);
+const pageSize = ref(20);
 const dialogVisible = ref(false);
 const form = ref({
   id: null,
@@ -115,8 +121,48 @@ const form = ref({
   createTime: ""
 });
 
-function fetchData() {
-  // TODO: 调用后端API获取数据
+async function fetchData() {
+  const params: any = {
+    userId: search.value.userId,
+    actionType: search.value.actionType,
+    page: page.value,
+    pageSize: pageSize.value
+  };
+  if (search.value.dateRange && search.value.dateRange.length === 2) {
+    params.startTime = search.value.dateRange[0];
+    params.endTime = search.value.dateRange[1];
+  }
+  const res = await queryUserActionLog(params);
+  tableData.value = res.data?.items || [];
+  total.value = res.data?.total || 0;
+}
+
+fetchData();
+
+function handlePageChange(val: number) {
+  page.value = val;
+  fetchData();
+}
+function handleSizeChange(val: number) {
+  pageSize.value = val;
+  page.value = 1;
+  fetchData();
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return "";
+  // 兼容带时区的 ISO 字符串
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  // 转为北京时间
+  const bjDate = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  const y = bjDate.getUTCFullYear();
+  const m = String(bjDate.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(bjDate.getUTCDate()).padStart(2, "0");
+  const h = String(bjDate.getUTCHours()).padStart(2, "0");
+  const min = String(bjDate.getUTCMinutes()).padStart(2, "0");
+  const s = String(bjDate.getUTCSeconds()).padStart(2, "0");
+  return `${y}-${m}-${d} ${h}:${min}:${s}`;
 }
 function openDialog() {
   form.value = {

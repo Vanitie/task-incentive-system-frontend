@@ -13,9 +13,10 @@
           style="width: 150px; margin-right: 8px"
         >
           <el-option label="全部" value="" />
-          <el-option label="行为" value="TASK_TYPE_BEHAVIOR" />
-          <el-option label="阶梯" value="TASK_TYPE_STAIR" />
-          <el-option label="限量" value="TASK_TYPE_LIMITED" />
+          <el-option label="累积任务" value="ACCUMULATE" />
+          <el-option label="连续任务" value="CONTINUOUS" />
+          <el-option label="阶梯任务" value="STAIR" />
+          <el-option label="时间窗口累积任务" value="WINDOW_ACCUMULATE" />
         </el-select>
         <el-select
           v-model="search.status"
@@ -60,6 +61,11 @@
         <el-table-column prop="taskType" label="任务类型">
           <template #default="scope">
             {{ getTaskTypeLabel(scope.row.taskType) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="stockType" label="库存类型">
+          <template #default="scope">
+            {{ getStockTypeLabel(scope.row.stockType) }}
           </template>
         </el-table-column>
         <el-table-column prop="triggerEvent" label="触发事件">
@@ -118,20 +124,35 @@
         @size-change="handleSizeChange"
       />
     </el-card>
-    <el-dialog v-model="dialogVisible" title="任务配置" width="500px">
-      <el-form :model="form">
+    <el-dialog v-model="dialogVisible" title="任务配置" width="680px">
+      <el-form :model="form" label-width="96px" class="task-config-form">
         <el-form-item label="任务名称">
-          <el-input v-model="form.taskName" />
+          <el-input v-model="form.taskName" class="form-control" />
         </el-form-item>
         <el-form-item label="任务类型">
-          <el-select v-model="form.taskType" @change="handleTaskTypeChange">
-            <el-option label="行为" value="TASK_TYPE_BEHAVIOR" />
-            <el-option label="阶梯" value="TASK_TYPE_STAIR" />
-            <el-option label="限量" value="TASK_TYPE_LIMITED" />
+          <el-select
+            v-model="form.taskType"
+            class="form-control"
+            @change="handleTaskTypeChange"
+          >
+            <el-option label="累积任务" value="ACCUMULATE" />
+            <el-option label="连续任务" value="CONTINUOUS" />
+            <el-option label="阶梯任务" value="STAIR" />
+            <el-option label="时间窗口累积任务" value="WINDOW_ACCUMULATE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="库存类型">
+          <el-select v-model="form.stockType" class="form-control">
+            <el-option label="无限" value="STOCK_TYPE_UNLIMITED" />
+            <el-option label="限量" value="STOCK_TYPE_LIMITED" />
           </el-select>
         </el-form-item>
         <el-form-item label="触发事件">
-          <el-select v-model="form.triggerEvent" placeholder="请选择触发事件">
+          <el-select
+            v-model="form.triggerEvent"
+            class="form-control"
+            placeholder="请选择触发事件"
+          >
             <el-option
               v-for="item in getTriggerEventOptions(form.taskType)"
               :key="item.value"
@@ -141,32 +162,134 @@
           </el-select>
         </el-form-item>
         <el-form-item label="奖励类型">
-          <el-select v-model="form.rewardType">
+          <el-select v-model="form.rewardType" class="form-control">
             <el-option label="积分" value="REWARD_POINT" />
             <el-option label="徽章" value="REWARD_BADGE" />
             <el-option label="实物" value="REWARD_PHYSICAL" />
           </el-select>
         </el-form-item>
         <el-form-item label="奖励数值">
-          <el-input v-model="form.rewardValue" type="number" />
+          <el-input
+            v-model="form.rewardValue"
+            class="form-control"
+            type="number"
+          />
         </el-form-item>
         <el-form-item label="库存">
-          <el-input v-model="form.totalStock" type="number" />
+          <el-input
+            v-model="form.totalStock"
+            class="form-control"
+            type="number"
+          />
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="form.status">
+          <el-select v-model="form.status" class="form-control">
             <el-option label="启用" :value="1" />
             <el-option label="停用" :value="0" />
           </el-select>
         </el-form-item>
         <el-form-item label="开始时间">
-          <el-date-picker v-model="form.startTime" type="datetime" />
+          <el-date-picker
+            v-model="form.startTime"
+            class="form-control"
+            type="datetime"
+          />
         </el-form-item>
         <el-form-item label="结束时间">
-          <el-date-picker v-model="form.endTime" type="datetime" />
+          <el-date-picker
+            v-model="form.endTime"
+            class="form-control"
+            type="datetime"
+          />
         </el-form-item>
         <el-form-item label="任务策略配置">
-          <el-input v-model="form.ruleConfig" type="textarea" />
+          <div class="strategy-config-wrap">
+            <template v-if="form.taskType === 'ACCUMULATE'">
+              <el-form-item label="目标值" label-width="96px">
+                <el-input-number
+                  v-model="form.strategyConfig.accumulate.targetValue"
+                  class="form-control"
+                  :min="1"
+                />
+              </el-form-item>
+            </template>
+
+            <template v-else-if="form.taskType === 'CONTINUOUS'">
+              <el-form-item label="目标天数" label-width="96px">
+                <el-input-number
+                  v-model="form.strategyConfig.continuous.targetDays"
+                  class="form-control"
+                  :min="1"
+                />
+              </el-form-item>
+            </template>
+
+            <template v-else-if="form.taskType === 'STAIR'">
+              <div class="stair-grid stair-header">
+                <span>阶梯</span>
+                <span>目标值</span>
+                <span>奖励值</span>
+                <span>操作</span>
+              </div>
+              <el-space direction="vertical" fill class="stair-space">
+                <div
+                  v-for="(stage, index) in form.strategyConfig.stair.stages"
+                  :key="index"
+                  class="stair-grid stair-row"
+                >
+                  <span>第{{ index + 1 }}阶梯</span>
+                  <el-input-number
+                    v-model="form.strategyConfig.stair.stages[index]"
+                    class="stair-input"
+                    :min="1"
+                    placeholder="目标值"
+                  />
+                  <el-input-number
+                    v-model="form.strategyConfig.stair.rewards[index]"
+                    class="stair-input"
+                    :min="1"
+                    placeholder="奖励值"
+                  />
+                  <el-button
+                    v-if="form.strategyConfig.stair.stages.length > 1"
+                    type="danger"
+                    text
+                    @click="removeStair(index)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+                <el-button
+                  type="primary"
+                  class="stair-add"
+                  link
+                  @click="addStair"
+                  >+ 新增阶梯</el-button
+                >
+              </el-space>
+            </template>
+
+            <template v-else-if="form.taskType === 'WINDOW_ACCUMULATE'">
+              <el-form-item label="窗口目标值" label-width="96px">
+                <el-input-number
+                  v-model="form.strategyConfig.windowAccumulate.targetValue"
+                  class="form-control"
+                  :min="1"
+                />
+              </el-form-item>
+              <el-form-item label="窗口分钟数" label-width="96px">
+                <el-input-number
+                  v-model="form.strategyConfig.windowAccumulate.windowMinutes"
+                  class="form-control window-minutes-input"
+                  :min="1"
+                />
+              </el-form-item>
+            </template>
+
+            <template v-else>
+              <el-empty description="请先选择任务类型" :image-size="72" />
+            </template>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -189,6 +312,7 @@ import {
 interface TaskConfigForm {
   taskName: string;
   taskType: string;
+  stockType: string;
   triggerEvent: string;
   rewardType: string;
   rewardValue: number;
@@ -196,13 +320,19 @@ interface TaskConfigForm {
   status: number;
   startTime: string | Date;
   endTime: string | Date;
-  ruleConfig: string;
+  strategyConfig: {
+    accumulate: { targetValue: number };
+    continuous: { targetDays: number };
+    stair: { stages: number[]; rewards: number[] };
+    windowAccumulate: { targetValue: number; windowMinutes: number };
+  };
 }
 
 interface TaskConfigItem {
   id: number;
   taskName: string;
   taskType: string;
+  stockType: string;
   triggerEvent: string;
   rewardType: string;
   rewardValue: number;
@@ -231,6 +361,7 @@ const dialogVisible = ref(false);
 const form = ref<TaskConfigForm>({
   taskName: "",
   taskType: "",
+  stockType: "STOCK_TYPE_UNLIMITED",
   triggerEvent: "",
   rewardType: "",
   rewardValue: 0,
@@ -238,15 +369,30 @@ const form = ref<TaskConfigForm>({
   status: 1,
   startTime: "",
   endTime: "",
-  ruleConfig: ""
+  strategyConfig: {
+    accumulate: { targetValue: 1 },
+    continuous: { targetDays: 1 },
+    stair: { stages: [1], rewards: [1] },
+    windowAccumulate: { targetValue: 1, windowMinutes: 60 }
+  }
 });
 const editId = ref<number | null>(null);
 
 const TASK_TYPE_LABELS: Record<string, string> = {
-  TASK_TYPE_BEHAVIOR: "行为任务",
-  TASK_TYPE_STAIR: "阶梯任务",
-  TASK_TYPE_LIMITED: "限量任务"
+  ACCUMULATE: "累积任务",
+  CONTINUOUS: "连续任务",
+  STAIR: "阶梯任务",
+  WINDOW_ACCUMULATE: "时间窗口累积任务"
 };
+
+const STOCK_TYPE_LABELS: Record<string, string> = {
+  STOCK_TYPE_UNLIMITED: "无限",
+  STOCK_TYPE_LIMITED: "限量"
+};
+
+function getStockTypeLabel(value: string) {
+  return STOCK_TYPE_LABELS[value] ?? value;
+}
 
 const REWARD_TYPE_LABELS: Record<string, string> = {
   REWARD_POINT: "积分",
@@ -258,22 +404,108 @@ const TRIGGER_EVENT_OPTIONS: Record<
   string,
   Array<{ label: string; value: string }>
 > = {
-  TASK_TYPE_BEHAVIOR: [
+  ACCUMULATE: [
     { label: "学习", value: "USER_LEARN" },
     { label: "登录", value: "USER_SIGN" },
     { label: "其他", value: "OTHER" }
   ],
-  TASK_TYPE_STAIR: [
+  CONTINUOUS: [
     { label: "学习", value: "USER_LEARN" },
     { label: "登录", value: "USER_SIGN" },
     { label: "其他", value: "OTHER" }
   ],
-  TASK_TYPE_LIMITED: [
+  STAIR: [
+    { label: "学习", value: "USER_LEARN" },
+    { label: "登录", value: "USER_SIGN" },
+    { label: "其他", value: "OTHER" }
+  ],
+  WINDOW_ACCUMULATE: [
     { label: "学习", value: "USER_LEARN" },
     { label: "登录", value: "USER_SIGN" },
     { label: "其他", value: "OTHER" }
   ]
 };
+
+function buildRuleConfigByTaskType(taskType: string) {
+  if (taskType === "ACCUMULATE") {
+    return {
+      targetValue: form.value.strategyConfig.accumulate.targetValue
+    };
+  }
+  if (taskType === "CONTINUOUS") {
+    return {
+      targetDays: form.value.strategyConfig.continuous.targetDays
+    };
+  }
+  if (taskType === "STAIR") {
+    return {
+      stages: form.value.strategyConfig.stair.stages,
+      rewards: form.value.strategyConfig.stair.rewards
+    };
+  }
+  if (taskType === "WINDOW_ACCUMULATE") {
+    return {
+      targetValue: form.value.strategyConfig.windowAccumulate.targetValue,
+      windowMinutes: form.value.strategyConfig.windowAccumulate.windowMinutes
+    };
+  }
+  return {};
+}
+
+function parseRuleConfigByTaskType(taskType: string, ruleConfig: string) {
+  let parsed: any = {};
+  try {
+    parsed = ruleConfig ? JSON.parse(ruleConfig) : {};
+  } catch {
+    parsed = {};
+  }
+
+  if (taskType === "ACCUMULATE") {
+    form.value.strategyConfig.accumulate.targetValue = Number(
+      parsed.targetValue || 1
+    );
+  }
+  if (taskType === "CONTINUOUS") {
+    form.value.strategyConfig.continuous.targetDays = Number(
+      parsed.targetDays || 1
+    );
+  }
+  if (taskType === "STAIR") {
+    const stages = Array.isArray(parsed.stages)
+      ? parsed.stages
+          .map((v: any) => Number(v || 0))
+          .filter((v: number) => v > 0)
+      : [1];
+    const rewards = Array.isArray(parsed.rewards)
+      ? parsed.rewards
+          .map((v: any) => Number(v || 0))
+          .filter((v: number) => v > 0)
+      : [];
+    form.value.strategyConfig.stair.stages = stages.length ? stages : [1];
+    form.value.strategyConfig.stair.rewards =
+      rewards.length === form.value.strategyConfig.stair.stages.length
+        ? rewards
+        : form.value.strategyConfig.stair.stages.map(() => 1);
+  }
+  if (taskType === "WINDOW_ACCUMULATE") {
+    form.value.strategyConfig.windowAccumulate.targetValue = Number(
+      parsed.targetValue || 1
+    );
+    form.value.strategyConfig.windowAccumulate.windowMinutes = Number(
+      parsed.windowMinutes || 60
+    );
+  }
+}
+
+function addStair() {
+  form.value.strategyConfig.stair.stages.push(1);
+  form.value.strategyConfig.stair.rewards.push(1);
+}
+
+function removeStair(index: number) {
+  form.value.strategyConfig.stair.stages.splice(index, 1);
+  form.value.strategyConfig.stair.rewards.splice(index, 1);
+}
 
 function formatShortId(id: number | string) {
   const text = String(id);
@@ -349,6 +581,7 @@ function openDialog() {
   form.value = {
     taskName: "",
     taskType: "",
+    stockType: "STOCK_TYPE_UNLIMITED",
     triggerEvent: "",
     rewardType: "",
     rewardValue: 0,
@@ -356,7 +589,12 @@ function openDialog() {
     status: 1,
     startTime: "",
     endTime: "",
-    ruleConfig: ""
+    strategyConfig: {
+      accumulate: { targetValue: 1 },
+      continuous: { targetDays: 1 },
+      stair: { stages: [1], rewards: [1] },
+      windowAccumulate: { targetValue: 1, windowMinutes: 60 }
+    }
   };
   editId.value = null;
   dialogVisible.value = true;
@@ -366,6 +604,7 @@ function editTask(row: any) {
   form.value = {
     taskName: row.taskName ?? "",
     taskType: row.taskType ?? "",
+    stockType: row.stockType ?? "STOCK_TYPE_UNLIMITED",
     triggerEvent: row.triggerEvent ?? "",
     rewardType: row.rewardType ?? "",
     rewardValue: row.rewardValue ?? 0,
@@ -373,8 +612,14 @@ function editTask(row: any) {
     status: row.status ?? 1,
     startTime: row.startTime ?? "",
     endTime: row.endTime ?? "",
-    ruleConfig: row.ruleConfig ?? ""
+    strategyConfig: {
+      accumulate: { targetValue: 1 },
+      continuous: { targetDays: 1 },
+      stair: { stages: [1], rewards: [1] },
+      windowAccumulate: { targetValue: 1, windowMinutes: 60 }
+    }
   };
+  parseRuleConfigByTaskType(form.value.taskType, row.ruleConfig ?? "");
   editId.value = row.id;
   dialogVisible.value = true;
 }
@@ -384,6 +629,13 @@ function handleTaskTypeChange(value: string) {
   const valid = options.some(item => item.value === form.value.triggerEvent);
   if (!valid) {
     form.value.triggerEvent = options[0]?.value ?? "";
+  }
+
+  if (value === "STAIR") {
+    if (!form.value.strategyConfig.stair.stages.length) {
+      form.value.strategyConfig.stair.stages = [1];
+      form.value.strategyConfig.stair.rewards = [1];
+    }
   }
 }
 
@@ -396,8 +648,10 @@ async function deleteTask(id: number) {
 }
 
 async function submitForm() {
+  const ruleConfigObject = buildRuleConfigByTaskType(form.value.taskType);
   const payload = {
     ...form.value,
+    ruleConfig: JSON.stringify(ruleConfigObject),
     startTime:
       typeof form.value.startTime === "string"
         ? form.value.startTime
@@ -407,6 +661,7 @@ async function submitForm() {
         ? form.value.endTime
         : (form.value.endTime as Date).toISOString()
   };
+  delete (payload as any).strategyConfig;
   if (editId.value) {
     await updateTaskConfig({ ...payload, id: editId.value });
   } else {
@@ -418,3 +673,53 @@ async function submitForm() {
 
 fetchData();
 </script>
+
+<style scoped>
+.task-config-form :deep(.el-form-item__content) {
+  margin-left: 16px;
+  flex: 1;
+}
+
+.form-control {
+  width: 100%;
+  max-width: 460px;
+}
+
+.strategy-config-wrap {
+  width: 100%;
+}
+
+.stair-space {
+  width: 100%;
+}
+
+.stair-grid {
+  display: grid;
+  grid-template-columns: 84px 140px 140px 72px;
+  align-items: center;
+  gap: 8px;
+}
+
+.stair-header {
+  margin-bottom: 8px;
+  padding: 0 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.stair-row {
+  padding-right: 12px;
+}
+
+.stair-input {
+  width: 132px;
+}
+
+.stair-add {
+  margin-left: 4px;
+}
+
+.window-minutes-input {
+  margin-left: 0;
+}
+</style>
