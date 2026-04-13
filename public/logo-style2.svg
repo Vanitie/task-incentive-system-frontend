@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="style2 logo">
+  <defs>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F766E"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <circle cx="512" cy="512" r="430" fill="#EAFBF9"/>
+  <circle cx="512" cy="512" r="280" fill="none" stroke="url(#g2)" stroke-width="58"/>
+  <circle cx="512" cy="216" r="52" fill="#0EA5A4"/>
+  <circle cx="792" cy="512" r="52" fill="#14B8A6"/>
+  <circle cx="512" cy="808" r="52" fill="#06B6D4"/>
+  <circle cx="232" cy="512" r="52" fill="#0D9488"/>
+  <path d="M562 268 438 520h118l-94 236 196-280H538z" fill="#F59E0B"/>
+  <path d="M250 512h160M614 512h160M512 250v122M512 652v122" stroke="#0F766E" stroke-width="28" stroke-linecap="round" opacity="0.7"/>
+</svg>

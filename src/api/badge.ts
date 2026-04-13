@@ -56,3 +56,17 @@ export function updateBadge(data: BadgeItem) {
 export function deleteBadge(id: number) {
   return http.request<ApiResponse<boolean>>("delete", `/api/badge/${id}`);
 }
+
+export function uploadBadgeImage(file: File, badgeId?: number) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (typeof badgeId === "number") {
+    formData.append("badgeId", String(badgeId));
+  }
+  return http.request<ApiResponse<string>>("post", "/api/badge/upload-image", {
+    data: formData,
+    headers: {
+      "Content-Type": "multipart/form-data"
+    }
+  });
+}

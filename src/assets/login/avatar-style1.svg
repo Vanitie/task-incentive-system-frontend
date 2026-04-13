@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" role="img" aria-label="style1 login avatar">
+  <defs>
+    <linearGradient id="a1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1D4ED8"/>
+      <stop offset="100%" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(20 10)">
+    <circle cx="120" cy="120" r="100" fill="#E8F3FF"/>
+    <path d="M120 36l58 34v68l-58 34-58-34V70z" fill="url(#a1)"/>
+    <path d="M92 128l22-24 18 16 20-28" fill="none" stroke="#1D4ED8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="88" cy="150" r="10" fill="#F59E0B"/>
+    <circle cx="152" cy="150" r="10" fill="#F59E0B"/>
+  </g>
+  <text x="270" y="124" font-size="84" font-weight="700" fill="#1E293B" font-family="Microsoft YaHei, PingFang SC, sans-serif">学励中台</text>
+  <text x="274" y="182" font-size="34" fill="#64748B" font-family="Microsoft YaHei, PingFang SC, sans-serif">任务徽章 · 成长轨迹 · 激励闭环</text>
+</svg>

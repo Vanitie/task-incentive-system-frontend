@@ -12,7 +12,6 @@
         <el-button @click="openDialog">新增徽章</el-button>
       </el-row>
       <el-table v-loading="loading" :data="tableData" style="margin-top: 16px">
-        <el-table-column prop="id" label="徽章ID" width="80" />
         <el-table-column prop="name" label="徽章名称" />
         <el-table-column prop="code" label="徽章标识" />
         <el-table-column prop="imageUrl" label="图片">
@@ -25,8 +24,16 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" />
-        <el-table-column prop="createTime" label="创建时间" />
-        <el-table-column prop="updateTime" label="更新时间" />
+        <el-table-column label="创建时间" min-width="170">
+          <template #default="scope">
+            {{ formatDateTime(scope.row.createTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="更新时间" min-width="170">
+          <template #default="scope">
+            {{ formatDateTime(scope.row.updateTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="180">
           <template #default="scope">
             <el-button size="small" @click="editBadge(scope.row)"
@@ -60,8 +67,38 @@
         <el-form-item label="徽章标识">
           <el-input v-model="form.code" type="number" />
         </el-form-item>
-        <el-form-item label="图片URL">
-          <el-input v-model="form.imageUrl" />
+        <el-form-item label="图片来源">
+          <el-radio-group v-model="imageMode">
+            <el-radio-button label="url">URL</el-radio-button>
+            <el-radio-button label="upload">上传文件</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="imageMode === 'url'" label="图片URL">
+          <el-input
+            v-model="form.imageUrl"
+            placeholder="https://example.com/badge.png"
+          />
+        </el-form-item>
+        <el-form-item v-else label="上传图片">
+          <el-upload
+            :auto-upload="false"
+            :limit="1"
+            :show-file-list="true"
+            :on-change="onFileChange"
+            :on-remove="onFileRemove"
+            accept="image/*"
+          >
+            <el-button type="primary">选择图片</el-button>
+            <template #tip>
+              <div class="el-upload__tip">支持 jpg/png/webp，保存时上传</div>
+            </template>
+          </el-upload>
+          <el-input
+            v-if="form.imageUrl"
+            v-model="form.imageUrl"
+            readonly
+            style="margin-top: 8px"
+          />
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" />
@@ -78,11 +115,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import type { UploadFile } from "element-plus";
 import {
   createBadge,
   deleteBadge as deleteBadgeApi,
   getBadgeList,
   searchBadgeByName,
+  uploadBadgeImage,
   updateBadge,
   type BadgeItem
 } from "@/api/badge";
@@ -96,6 +135,8 @@ const page = ref({
   total: 0
 });
 const dialogVisible = ref(false);
+const imageMode = ref<"url" | "upload">("url");
+const selectedImageFile = ref<File | null>(null);
 const form = ref({
   id: undefined as number | undefined,
   name: "",
@@ -143,6 +184,8 @@ function handleSizeChange() {
 }
 
 function openDialog() {
+  imageMode.value = "url";
+  selectedImageFile.value = null;
   form.value = {
     id: undefined,
     name: "",
@@ -154,7 +197,35 @@ function openDialog() {
 }
 function editBadge(row: any) {
   form.value = { ...row };
+  imageMode.value = "url";
+  selectedImageFile.value = null;
   dialogVisible.value = true;
+}
+
+function onFileChange(file: UploadFile) {
+  selectedImageFile.value = (file.raw as File) || null;
+}
+
+function onFileRemove() {
+  selectedImageFile.value = null;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "-";
+  const normalized = String(value)
+    .replace("T", " ")
+    .replace(/\.\d+\+00:00$/, "");
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return normalized;
+  }
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
 async function deleteBadge(id: number) {
@@ -181,12 +252,33 @@ async function submitForm() {
     return;
   }
 
+  if (imageMode.value === "url" && !form.value.imageUrl?.trim()) {
+    ElMessage.warning("请填写图片URL或切换为上传文件");
+    return;
+  }
+
+  if (imageMode.value === "upload" && !selectedImageFile.value) {
+    ElMessage.warning("请先选择图片文件");
+    return;
+  }
+
   try {
+    let imageUrl = form.value.imageUrl?.trim() || "";
+    if (imageMode.value === "upload" && selectedImageFile.value) {
+      const uploadRes = await uploadBadgeImage(selectedImageFile.value);
+      const uploadData = unwrapData(uploadRes);
+      imageUrl = typeof uploadData === "string" ? uploadData : "";
+      if (!imageUrl) {
+        ElMessage.error("图片上传失败，请重试");
+        return;
+      }
+    }
+
     const payload: BadgeItem = {
       ...(form.value.id ? { id: form.value.id } : {}),
       name: form.value.name.trim(),
       code: Number(form.value.code || 0),
-      imageUrl: form.value.imageUrl?.trim() || "",
+      imageUrl,
       description: form.value.description?.trim() || ""
     };
 
@@ -198,6 +290,7 @@ async function submitForm() {
       ElMessage.success("新增成功");
     }
     dialogVisible.value = false;
+    selectedImageFile.value = null;
     fetchData();
   } catch {
     ElMessage.error(form.value.id ? "更新失败" : "新增失败");

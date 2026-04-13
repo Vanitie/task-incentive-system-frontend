@@ -2,6 +2,27 @@
   <div class="risk-decisions-page">
     <el-card shadow="never">
       <el-form :inline="true" :model="query" class="query-form">
+        <el-form-item label="用户ID">
+          <el-input
+            v-model="query.userId"
+            placeholder="请输入用户ID"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="用户名">
+          <el-input
+            v-model="query.userName"
+            placeholder="请输入用户名"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="任务名">
+          <el-input
+            v-model="query.taskName"
+            placeholder="请输入任务名称"
+            clearable
+          />
+        </el-form-item>
         <el-form-item label="任务ID">
           <el-input
             v-model="query.taskId"
@@ -53,9 +74,15 @@
           </template>
         </el-table-column>
         <el-table-column prop="latencyMs" label="耗时(ms)" width="100" />
+        <el-table-column prop="taskName" label="任务名" min-width="180" />
         <el-table-column prop="taskId" label="任务ID" min-width="160" />
+        <el-table-column prop="userName" label="用户名" min-width="140" />
         <el-table-column prop="userId" label="用户ID" min-width="160" />
-        <el-table-column prop="createdAt" label="时间" min-width="180" />
+        <el-table-column prop="createdAt" label="时间" min-width="180">
+          <template #default="scope">
+            {{ formatDateTime(scope.row.createdAt) }}
+          </template>
+        </el-table-column>
       </el-table>
 
       <el-pagination
@@ -80,10 +107,16 @@ import { getRiskDecisions, type RiskDecisionItem } from "@/api/risk";
 const loading = ref(false);
 
 const query = ref<{
+  userId: string;
+  userName: string;
+  taskName: string;
   taskId: string;
   decision?: string;
   timeRange: [Date, Date] | [];
 }>({
+  userId: "",
+  userName: "",
+  taskName: "",
   taskId: "",
   decision: undefined,
   timeRange: []
@@ -125,6 +158,23 @@ function formatHitRules(hitRules?: RiskDecisionItem["hitRules"]) {
   return hitRules.map(item => item.ruleName || String(item.ruleId)).join(", ");
 }
 
+function formatDateTime(value?: string) {
+  if (!value) return "-";
+  const date = new Date(String(value));
+  if (!Number.isNaN(date.getTime())) {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const mi = String(date.getMinutes()).padStart(2, "0");
+    const ss = String(date.getSeconds()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+  }
+  return String(value)
+    .replace("T", " ")
+    .replace(/\.\d+([+-]\d{2}:\d{2}|Z)$/, "");
+}
+
 async function fetchData() {
   loading.value = true;
   try {
@@ -132,7 +182,10 @@ async function fetchData() {
     const response = await getRiskDecisions({
       page: page.value.current,
       size: page.value.size,
+      userId: query.value.userId || undefined,
+      userName: query.value.userName || undefined,
       taskId: query.value.taskId || undefined,
+      taskName: query.value.taskName || undefined,
       decision: query.value.decision || undefined,
       start: toIso(start),
       end: toIso(end)
@@ -149,7 +202,14 @@ async function fetchData() {
 }
 
 function resetQuery() {
-  query.value = { taskId: "", decision: undefined, timeRange: [] };
+  query.value = {
+    userId: "",
+    userName: "",
+    taskName: "",
+    taskId: "",
+    decision: undefined,
+    timeRange: []
+  };
   page.value.current = 1;
   fetchData();
 }

@@ -1,20 +1,17 @@
 <template>
   <div class="risk-dashboard">
-    <el-row :gutter="16">
-      <el-col
+    <div class="metric-grid">
+      <el-card
         v-for="card in metricCards"
         :key="card.key"
-        :xs="24"
-        :sm="12"
-        :md="8"
-        :lg="4"
+        shadow="hover"
+        class="metric-card"
       >
-        <el-card shadow="hover" class="metric-card">
-          <div class="metric-title">{{ card.title }}</div>
-          <div class="metric-value">{{ card.value }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
+        <div class="metric-title">{{ card.title }}</div>
+        <div class="metric-value">{{ card.value }}</div>
+        <div class="metric-sub-value">{{ card.subValue || "\u00A0" }}</div>
+      </el-card>
+    </div>
 
     <el-card class="trend-card" shadow="never">
       <template #header>
@@ -80,6 +77,17 @@ import {
 } from "@/api/risk";
 
 type MetricCard = { key: string; title: string; value: string };
+type DecisionStatus = "PASS" | "REJECT" | "DEGRADE_PASS" | "REVIEW" | "FREEZE";
+type MetricCardExt = MetricCard & { subValue?: string };
+type TrendRow = RiskDailyTrendItem & {
+  pass: number;
+  reject: number;
+  degradePass: number;
+  review: number;
+  freeze: number;
+  passRate: number;
+  interceptRate: number;
+};
 
 const loadingOverview = ref(false);
 const loadingTrend = ref(false);
@@ -96,39 +104,74 @@ const overview = ref<RiskDashboardOverview>({
   p95LatencyMs: 0,
   p99LatencyMs: 0
 });
-const trendList = ref<
-  Array<RiskDailyTrendItem & { passRate: number; interceptRate: number }>
->([]);
+const trendList = ref<TrendRow[]>([]);
 const trendChartRef = ref<HTMLElement | null>(null);
 let trendChart: echarts.ECharts | null = null;
 
-const metricCards = computed<MetricCard[]>(() => [
-  {
-    key: "totalDecisions",
-    title: "总决策数",
-    value: String(overview.value.total)
-  },
-  {
-    key: "interceptRate",
-    title: "拦截率",
-    value: formatRate(overview.value.interceptRate)
-  },
-  {
-    key: "passRate",
-    title: "放行率",
-    value: formatRate(overview.value.passRate)
-  },
-  {
-    key: "p95",
-    title: "P95耗时",
-    value: `${overview.value.p95LatencyMs} ms`
-  },
-  {
-    key: "p99",
-    title: "P99耗时",
-    value: `${overview.value.p99LatencyMs} ms`
-  }
-]);
+const STATUS_ORDER: DecisionStatus[] = [
+  "PASS",
+  "REJECT",
+  "DEGRADE_PASS",
+  "REVIEW",
+  "FREEZE"
+];
+
+const STATUS_LABEL_MAP: Record<DecisionStatus, string> = {
+  PASS: "放行",
+  REJECT: "拒绝",
+  DEGRADE_PASS: "降级放行",
+  REVIEW: "人工复核",
+  FREEZE: "冻结"
+};
+
+const STATUS_COLOR_MAP: Record<DecisionStatus, string> = {
+  PASS: "#2d7ff9",
+  REJECT: "#f56c6c",
+  DEGRADE_PASS: "#e6a23c",
+  REVIEW: "#909399",
+  FREEZE: "#7c3aed"
+};
+
+const metricCards = computed<MetricCardExt[]>(() => {
+  const statusCards = STATUS_ORDER.map(status => {
+    const count = getStatusCount(
+      overview.value.statusCounts,
+      status,
+      getLegacyOverviewCount(status)
+    );
+    const rate = Number(overview.value.statusRates?.[status] ?? 0);
+    return {
+      key: status,
+      title: STATUS_LABEL_MAP[status],
+      value: String(count),
+      subValue: `${formatRate(rate)} · 占比`
+    };
+  });
+
+  return [
+    {
+      key: "total",
+      title: "决策总数",
+      value: String(overview.value.total)
+    },
+    ...statusCards,
+    {
+      key: "avgLatency",
+      title: "平均耗时",
+      value: `${Number(overview.value.avgLatencyMs || 0).toFixed(2)} ms`
+    },
+    {
+      key: "p95Latency",
+      title: "P95耗时",
+      value: `${Number(overview.value.p95LatencyMs || 0).toFixed(2)} ms`
+    },
+    {
+      key: "p99Latency",
+      title: "P99耗时",
+      value: `${Number(overview.value.p99LatencyMs || 0).toFixed(2)} ms`
+    }
+  ];
+});
 
 function unwrapData<T>(payload: T | { data?: T }): T {
   if (payload && typeof payload === "object" && "data" in payload) {
@@ -139,7 +182,27 @@ function unwrapData<T>(payload: T | { data?: T }): T {
 }
 
 function formatRate(value: number) {
-  return `${(Number(value) * 100).toFixed(2)}%`;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "0.00%";
+  return `${numeric.toFixed(2)}%`;
+}
+
+function getLegacyOverviewCount(status: DecisionStatus) {
+  if (status === "PASS") return overview.value.pass;
+  if (status === "REJECT") return overview.value.reject;
+  if (status === "DEGRADE_PASS") return overview.value.degradePass;
+  if (status === "REVIEW") return overview.value.review;
+  return overview.value.freeze;
+}
+
+function getStatusCount(
+  statusCounts: Record<string, number> | undefined,
+  key: DecisionStatus,
+  fallback: number | undefined
+) {
+  const count = statusCounts?.[key];
+  if (Number.isFinite(Number(count))) return Number(count);
+  return Number(fallback || 0);
 }
 
 function initTrendChart() {
@@ -152,18 +215,36 @@ function renderTrendChart() {
   if (!trendChart) return;
 
   const dateLabels = trendList.value.map(item => item.date.slice(5));
-  const passRateData = trendList.value.map(item =>
-    Number((item.passRate * 100).toFixed(2))
-  );
-  const interceptRateData = trendList.value.map(item =>
-    Number((item.interceptRate * 100).toFixed(2))
-  );
+  const series = STATUS_ORDER.map(status => {
+    const data = trendList.value.map(item => {
+      if (status === "PASS") return item.pass;
+      if (status === "REJECT") return item.reject;
+      if (status === "DEGRADE_PASS") return item.degradePass;
+      if (status === "REVIEW") return item.review;
+      return item.freeze;
+    });
+
+    return {
+      name: STATUS_LABEL_MAP[status],
+      type: "line",
+      smooth: true,
+      symbol: "circle",
+      symbolSize: 7,
+      data,
+      lineStyle: {
+        width: 3,
+        color: STATUS_COLOR_MAP[status]
+      },
+      areaStyle: {
+        color: "transparent"
+      }
+    };
+  });
 
   trendChart.setOption({
     backgroundColor: "transparent",
     tooltip: {
-      trigger: "axis",
-      valueFormatter: (value: number | string) => `${value}%`
+      trigger: "axis"
     },
     legend: {
       top: 0,
@@ -196,48 +277,13 @@ function renderTrendChart() {
     yAxis: {
       type: "value",
       min: 0,
-      max: 100,
-      axisLabel: {
-        formatter: "{value}%"
-      },
       splitLine: {
         lineStyle: {
           color: "#ebeef5"
         }
       }
     },
-    series: [
-      {
-        name: "放行率",
-        type: "line",
-        smooth: true,
-        symbol: "circle",
-        symbolSize: 7,
-        data: passRateData,
-        lineStyle: {
-          width: 3,
-          color: "#2d7ff9"
-        },
-        areaStyle: {
-          color: "rgba(45,127,249,0.16)"
-        }
-      },
-      {
-        name: "拦截率",
-        type: "line",
-        smooth: true,
-        symbol: "circle",
-        symbolSize: 7,
-        data: interceptRateData,
-        lineStyle: {
-          width: 3,
-          color: "#f56c6c"
-        },
-        areaStyle: {
-          color: "rgba(245,108,108,0.16)"
-        }
-      }
-    ]
+    series
   });
 }
 
@@ -265,15 +311,25 @@ async function fetchTrend() {
     const list = Array.isArray(data) ? data : [];
     trendList.value = list.map(item => {
       const total = Number(item.total) || 0;
-      const passRate = total > 0 ? Number(item.pass || 0) / total : 0;
-      const interceptCount =
-        Number(item.reject || 0) +
-        Number(item.degradePass || 0) +
-        Number(item.review || 0) +
-        Number(item.freeze || 0);
-      const interceptRate = total > 0 ? interceptCount / total : 0;
+      const pass = getStatusCount(item.statusCounts, "PASS", item.pass);
+      const reject = getStatusCount(item.statusCounts, "REJECT", item.reject);
+      const degradePass = getStatusCount(
+        item.statusCounts,
+        "DEGRADE_PASS",
+        item.degradePass
+      );
+      const review = getStatusCount(item.statusCounts, "REVIEW", item.review);
+      const freeze = getStatusCount(item.statusCounts, "FREEZE", item.freeze);
+      const interceptCount = reject + degradePass + review + freeze;
+      const passRate = total > 0 ? (pass / total) * 100 : 0;
+      const interceptRate = total > 0 ? (interceptCount / total) * 100 : 0;
       return {
         ...item,
+        pass,
+        reject,
+        degradePass,
+        review,
+        freeze,
         passRate,
         interceptRate
       };
@@ -312,8 +368,18 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .metric-card {
   min-height: 110px;
+}
+
+.metric-card :deep(.el-card__body) {
+  padding: 12px;
 }
 
 .metric-title {
@@ -326,6 +392,14 @@ onBeforeUnmount(() => {
   font-size: 26px;
   font-weight: 700;
   color: var(--el-text-color-primary);
+}
+
+.metric-sub-value {
+  margin-top: 6px;
+  min-height: 18px;
+  line-height: 18px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .trend-card {
@@ -343,7 +417,23 @@ onBeforeUnmount(() => {
   height: 320px;
 }
 
+@media (max-width: 1680px) {
+  .metric-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1280px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
   .metric-value {
     font-size: 22px;
   }

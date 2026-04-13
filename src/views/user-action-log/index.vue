@@ -15,6 +15,7 @@
           <el-option label="全部" value="" />
           <el-option label="学习" value="USER_LEARN" />
           <el-option label="签到" value="USER_SIGN" />
+          <el-option label="领奖" value="USER_REWARD_CLAIM" />
           <el-option label="其他" value="OTHER" />
         </el-select>
         <el-date-picker
@@ -28,11 +29,10 @@
         <el-button @click="openDialog">新增行为</el-button>
       </el-row>
       <el-table :data="tableData" style="margin-top: 16px">
-        <el-table-column prop="id" label="日志ID" width="80" />
-        <el-table-column prop="userId" label="用户ID" />
+        <el-table-column prop="userName" label="用户名" min-width="140" />
         <el-table-column prop="actionType" label="行为类型">
           <template #default="scope">
-            <el-tag>
+            <el-tag :type="actionTypeTagType(scope.row.actionType)">
               {{ actionTypeMap[scope.row.actionType] || scope.row.actionType }}
             </el-tag>
           </template>
@@ -43,8 +43,11 @@
             {{ formatDate(scope.row.createTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column label="操作" width="240">
           <template #default="scope">
+            <el-button size="small" @click="showDetail(scope.row)"
+              >详情</el-button
+            >
             <el-button size="small" @click="editLog(scope.row)">编辑</el-button>
             <el-button
               size="small"
@@ -67,6 +70,31 @@
         @size-change="handleSizeChange"
       />
     </el-card>
+    <el-dialog v-model="detailVisible" title="行为日志详情" width="500px">
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="日志ID">{{
+          detail.id
+        }}</el-descriptions-item>
+        <el-descriptions-item label="用户ID">{{
+          detail.userId
+        }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">{{
+          detail.userName || "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="行为类型">{{
+          actionTypeMap[detail.actionType] || detail.actionType
+        }}</el-descriptions-item>
+        <el-descriptions-item label="行为数值">{{
+          detail.actionValue
+        }}</el-descriptions-item>
+        <el-descriptions-item label="行为发生时间">{{
+          formatDate(detail.createTime)
+        }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
     <el-dialog v-model="dialogVisible" title="用户行为日志" width="500px">
       <el-form :model="form">
         <el-form-item label="用户ID">
@@ -76,6 +104,7 @@
           <el-select v-model="form.actionType">
             <el-option label="学习" value="USER_LEARN" />
             <el-option label="签到" value="USER_SIGN" />
+            <el-option label="领奖" value="USER_REWARD_CLAIM" />
             <el-option label="其他" value="OTHER" />
           </el-select>
         </el-form-item>
@@ -104,8 +133,20 @@ import {
 const actionTypeMap = {
   USER_LEARN: "学习",
   USER_SIGN: "签到",
+  USER_TASK_ACCEPT: "接取任务",
+  USER_TASK_COMPLETE: "完成任务",
+  USER_REWARD_CLAIM: "领取奖励",
   OTHER: "其他"
 };
+
+function actionTypeTagType(actionType: string) {
+  if (actionType === "USER_SIGN") return "success";
+  if (actionType === "USER_LEARN") return "primary";
+  if (actionType === "USER_TASK_ACCEPT") return "warning";
+  if (actionType === "USER_TASK_COMPLETE") return "success";
+  if (actionType === "USER_REWARD_CLAIM") return "danger";
+  return "info";
+}
 
 const search = ref({ userId: "", actionType: "", dateRange: [] as string[] });
 const tableData = ref<UserActionLogItem[]>([]);
@@ -113,8 +154,16 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const dialogVisible = ref(false);
+const detailVisible = ref(false);
 const form = ref({
   id: null,
+  userId: "",
+  actionType: "",
+  actionValue: 0,
+  createTime: ""
+});
+const detail = ref<UserActionLogItem>({
+  id: "",
   userId: "",
   actionType: "",
   actionValue: 0,
@@ -178,6 +227,12 @@ function editLog(row: any) {
   form.value = { ...row };
   dialogVisible.value = true;
 }
+
+function showDetail(row: UserActionLogItem) {
+  detail.value = { ...row };
+  detailVisible.value = true;
+}
+
 function deleteLog(id: number) {
   // TODO: 调用后端API删除
 }

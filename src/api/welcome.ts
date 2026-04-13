@@ -27,6 +27,13 @@ export interface DailyStatsRes {
   taskCount: number;
   rewardCount: number;
 }
+export interface LatestActivityRes {
+  type: string;
+  level: "info" | "warning" | "danger" | string;
+  title: string;
+  summary: string;
+  time: string;
+}
 export interface BackendApiResponse<T> {
   code: number;
   msg: string;
@@ -79,6 +86,13 @@ export function getWeeklyCompletion() {
 export function getDailyStats(params: { page?: number; size?: number }) {
   return http.get<BackendApiResponse<DailyStatsRes[]>, typeof params>(
     "/api/stats/daily-stats",
+    { params }
+  );
+}
+
+export function getLatestActivities(params?: { limit?: number }) {
+  return http.get<BackendApiResponse<LatestActivityRes[]>, typeof params>(
+    "/api/stats/latest-activities",
     { params }
   );
 }

@@ -2,6 +2,13 @@
   <div class="risk-quotas-page">
     <el-card shadow="never">
       <el-form :inline="true" :model="query" class="query-form">
+        <el-form-item label="配额名称">
+          <el-input
+            v-model="query.quotaName"
+            clearable
+            placeholder="例如 每日积分上限"
+          />
+        </el-form-item>
         <el-form-item label="作用域类型">
           <el-select v-model="query.scopeType" clearable style="width: 160px">
             <el-option label="用户(user)" value="user" />
@@ -56,7 +63,7 @@
       </el-form>
 
       <el-table v-loading="loading" :data="tableData" border>
-        <el-table-column prop="id" label="ID" width="100" />
+        <el-table-column prop="quotaName" label="配额名称" min-width="180" />
         <el-table-column prop="scopeType" label="作用域类型" width="130" />
         <el-table-column prop="scopeId" label="作用域ID" min-width="140" />
         <el-table-column prop="resourceType" label="资源类型" min-width="130" />
@@ -64,10 +71,21 @@
         <el-table-column prop="periodType" label="周期类型" width="120" />
         <el-table-column prop="limitValue" label="限制值" min-width="120" />
         <el-table-column prop="usedValue" label="已使用" min-width="120" />
-        <el-table-column prop="resetAt" label="重置时间" min-width="180" />
-        <el-table-column prop="createdAt" label="创建时间" min-width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="resetAt" label="重置时间" min-width="180">
           <template #default="scope">
+            {{ normalizeDateTime(scope.row.resetAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" min-width="180">
+          <template #default="scope">
+            {{ normalizeDateTime(scope.row.createdAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="260" fixed="right">
+          <template #default="scope">
+            <el-button size="small" @click="openDetail(scope.row)">
+              详情
+            </el-button>
             <el-button size="small" type="primary" @click="openEdit(scope.row)">
               修改
             </el-button>
@@ -98,6 +116,12 @@
       <el-form :model="editForm" label-width="100px">
         <el-form-item label="配额ID">
           <el-input :model-value="String(editForm.id || '')" readonly />
+        </el-form-item>
+        <el-form-item label="配额名称">
+          <el-input
+            v-model="editForm.quotaName"
+            placeholder="例如 每日积分上限"
+          />
         </el-form-item>
         <el-form-item label="作用域类型">
           <el-select v-model="editForm.scopeType" style="width: 220px">
@@ -144,6 +168,12 @@
 
     <el-dialog v-model="createDialogVisible" title="新增配额" width="560px">
       <el-form :model="createForm" label-width="100px">
+        <el-form-item label="配额名称">
+          <el-input
+            v-model="createForm.quotaName"
+            placeholder="例如 每日积分上限"
+          />
+        </el-form-item>
         <el-form-item label="作用域类型">
           <el-select v-model="createForm.scopeType" style="width: 220px">
             <el-option label="用户(user)" value="user" />
@@ -186,6 +216,47 @@
         >
       </template>
     </el-dialog>
+
+    <el-dialog v-model="detailVisible" title="配额详情" width="640px">
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="配额ID">{{
+          detail.id
+        }}</el-descriptions-item>
+        <el-descriptions-item label="配额名称">{{
+          detail.quotaName || "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="作用域类型">{{
+          detail.scopeType || "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="作用域ID">{{
+          detail.scopeId || "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="资源类型">{{
+          detail.resourceType || "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="资源ID">{{
+          detail.resourceId || "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="周期类型">{{
+          detail.periodType || "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="限制值">{{
+          detail.limitValue ?? "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="已使用">{{
+          detail.usedValue ?? "-"
+        }}</el-descriptions-item>
+        <el-descriptions-item label="重置时间">{{
+          normalizeDateTime(detail.resetAt)
+        }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间" :span="2">{{
+          normalizeDateTime(detail.createdAt)
+        }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -206,6 +277,7 @@ const updating = ref(false);
 const creating = ref(false);
 const dialogVisible = ref(false);
 const createDialogVisible = ref(false);
+const detailVisible = ref(false);
 
 const resourceTypeOptions = [
   { label: "积分(POINT)", value: "POINT" },
@@ -215,6 +287,7 @@ const resourceTypeOptions = [
 ];
 
 const query = ref<{
+  quotaName?: string;
   scopeType?: string;
   scopeId?: string;
   resourceType?: string;
@@ -229,9 +302,11 @@ const page = ref({
 });
 
 const tableData = ref<RiskQuotaItem[]>([]);
+const detail = ref<Partial<RiskQuotaItem>>({});
 
 const editForm = ref<RiskQuotaRequest>({
   id: undefined,
+  quotaName: "",
   scopeType: "user",
   scopeId: "",
   resourceType: "ALL",
@@ -241,6 +316,7 @@ const editForm = ref<RiskQuotaRequest>({
 });
 
 const createForm = ref<RiskQuotaRequest>({
+  quotaName: "",
   scopeType: "user",
   scopeId: "",
   resourceType: "ALL",
@@ -262,6 +338,7 @@ async function fetchData() {
     const response = await getRiskQuotas({
       page: page.value.current,
       size: page.value.size,
+      quotaName: query.value.quotaName,
       scopeType: query.value.scopeType,
       scopeId: query.value.scopeId,
       resourceType: query.value.resourceType,
@@ -287,6 +364,7 @@ function resetQuery() {
 function openEdit(row: RiskQuotaItem) {
   editForm.value = {
     id: row.id,
+    quotaName: row.quotaName || "",
     scopeType: row.scopeType,
     scopeId: row.scopeId,
     resourceType: row.resourceType || "",
@@ -299,6 +377,7 @@ function openEdit(row: RiskQuotaItem) {
 
 function openCreateDialog() {
   createForm.value = {
+    quotaName: "",
     scopeType: "user",
     scopeId: "",
     resourceType: "ALL",
@@ -309,15 +388,28 @@ function openCreateDialog() {
   createDialogVisible.value = true;
 }
 
+function openDetail(row: RiskQuotaItem) {
+  detail.value = { ...row };
+  detailVisible.value = true;
+}
+
+function normalizeDateTime(input?: string) {
+  if (!input) return "-";
+  return String(input)
+    .replace("T", " ")
+    .replace(/\.\d+\+00:00$/, "");
+}
+
 async function submitCreate() {
   if (
+    !createForm.value.quotaName ||
     !createForm.value.scopeType ||
     !createForm.value.scopeId ||
     !createForm.value.resourceType ||
     !createForm.value.resourceId ||
     !createForm.value.periodType
   ) {
-    ElMessage.warning("请先填写作用域、资源和周期相关字段");
+    ElMessage.warning("请先填写配额名称、作用域、资源和周期相关字段");
     return;
   }
 
@@ -357,6 +449,7 @@ async function handleDelete(row: RiskQuotaItem) {
 async function submitEdit() {
   if (
     editForm.value.id === undefined ||
+    !editForm.value.quotaName ||
     !editForm.value.scopeType ||
     !editForm.value.scopeId ||
     !editForm.value.resourceType ||

@@ -3,8 +3,18 @@
     <el-card>
       <el-row>
         <el-input
+          v-model="search.userName"
+          placeholder="用户名"
+          style="width: 200px; margin-right: 8px"
+        />
+        <el-input
           v-model="search.userId"
           placeholder="用户ID"
+          style="width: 200px; margin-right: 8px"
+        />
+        <el-input
+          v-model="search.taskName"
+          placeholder="任务名"
           style="width: 200px; margin-right: 8px"
         />
         <el-input
@@ -18,15 +28,16 @@
           style="width: 150px; margin-right: 8px"
         >
           <el-option label="全部" value="" />
-          <el-option label="未完成" value="0" />
-          <el-option label="已完成" value="1" />
+          <el-option label="已领取" value="1" />
+          <el-option label="进行中" value="2" />
+          <el-option label="已完成" value="3" />
+          <el-option label="已取消" value="4" />
         </el-select>
         <el-button type="primary" @click="fetchData">搜索</el-button>
       </el-row>
       <el-table :data="tableData" style="margin-top: 16px">
-        <el-table-column prop="id" label="实例ID" width="80" />
-        <el-table-column prop="userId" label="用户ID" />
-        <el-table-column prop="taskId" label="任务ID" />
+        <el-table-column prop="userName" label="用户名" min-width="140" />
+        <el-table-column prop="taskName" label="任务名" min-width="160" />
         <el-table-column prop="progress" label="进度">
           <template #default="scope">
             <el-progress :percentage="scope.row.progress" />
@@ -34,13 +45,21 @@
         </el-table-column>
         <el-table-column prop="status" label="状态">
           <template #default="scope">
-            <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">
-              {{ scope.row.status === 1 ? "已完成" : "未完成" }}
+            <el-tag :type="getStatusTagType(scope.row.status)">
+              {{ getStatusLabel(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" />
-        <el-table-column prop="updateTime" label="更新时间" />
+        <el-table-column prop="createTime" label="创建时间">
+          <template #default="scope">
+            {{ normalizeDateTime(scope.row.createTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateTime" label="更新时间">
+          <template #default="scope">
+            {{ normalizeDateTime(scope.row.updateTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="120">
           <template #default="scope">
             <el-button size="small" @click="showDetail(scope.row)"
@@ -70,23 +89,29 @@
         <el-descriptions-item label="用户ID">{{
           detail.userId
         }}</el-descriptions-item>
+        <el-descriptions-item label="用户名">{{
+          detail.userName
+        }}</el-descriptions-item>
         <el-descriptions-item label="任务ID">{{
           detail.taskId
+        }}</el-descriptions-item>
+        <el-descriptions-item label="任务名">{{
+          detail.taskName
         }}</el-descriptions-item>
         <el-descriptions-item label="进度">{{
           detail.progress
         }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{
-          detail.status === 1 ? "已完成" : "未完成"
+          getStatusLabel(detail.status)
         }}</el-descriptions-item>
         <el-descriptions-item label="扩展数据">{{
           detail.extraData
         }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{
-          detail.createTime
+          normalizeDateTime(detail.createTime)
         }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{
-          detail.updateTime
+          normalizeDateTime(detail.updateTime)
         }}</el-descriptions-item>
       </el-descriptions>
       <template #footer>
@@ -108,7 +133,9 @@ function handleSizeChange(newSize: number) {
 interface UserTaskInstanceForm {
   id: number;
   userId: number;
+  userName: string;
   taskId: number;
+  taskName: string;
   progress: number;
   status: number;
   version: number;
@@ -117,10 +144,20 @@ interface UserTaskInstanceForm {
   updateTime: string | Date;
 }
 
-import { getUserTaskList } from "@/api/user-task";
+import {
+  getUserTaskList,
+  type UserTaskListItem,
+  type UserTaskListPage
+} from "@/api/user-task";
 
-const search = ref({ userId: "", taskId: "", status: "" });
-const tableData = ref([]);
+const search = ref({
+  userName: "",
+  userId: "",
+  taskName: "",
+  taskId: "",
+  status: ""
+});
+const tableData = ref<UserTaskListItem[]>([]);
 const page = ref(1);
 const size = ref(20);
 const total = ref(0);
@@ -128,7 +165,9 @@ const dialogVisible = ref(false);
 const detail = ref<UserTaskInstanceForm>({
   id: 0,
   userId: 0,
+  userName: "",
   taskId: 0,
+  taskName: "",
   progress: 0,
   status: 0,
   version: 0,
@@ -138,17 +177,21 @@ const detail = ref<UserTaskInstanceForm>({
 });
 
 async function fetchData() {
-  const params: any = {};
+  const params: Record<string, string | number> = {};
+  if (search.value.userName) params.userName = search.value.userName;
   if (search.value.userId) params.userId = search.value.userId;
+  if (search.value.taskName) params.taskName = search.value.taskName;
   if (search.value.taskId) params.taskId = search.value.taskId;
   if (search.value.status) params.status = search.value.status;
   params.page = page.value;
   params.size = size.value;
   const res = await getUserTaskList(params);
   const r = res as any;
-  const items = r?.data?.data?.items || r?.data?.items || [];
-  tableData.value = items;
-  total.value = r?.data?.data?.total || r?.data?.total || 0;
+  const pageData = (r?.data?.data ||
+    r?.data ||
+    {}) as UserTaskListPage<UserTaskListItem>;
+  tableData.value = pageData.items || [];
+  total.value = Number(pageData.total || 0);
 }
 
 function handlePageChange(newPage: number) {
@@ -156,10 +199,58 @@ function handlePageChange(newPage: number) {
   fetchData();
 }
 
-function showDetail(row: any) {
-  detail.value = { ...row };
+function showDetail(row: UserTaskListItem) {
+  detail.value = {
+    id: Number(row.id || 0),
+    userId: Number(row.userId || 0),
+    userName: String(row.userName || ""),
+    taskId: Number(row.taskId || 0),
+    taskName: String(row.taskName || ""),
+    progress: Number(row.progress || 0),
+    status: Number(row.status || 0),
+    version: Number(row.version || 0),
+    extraData: String(row.extraData || ""),
+    createTime: row.createTime || "",
+    updateTime: row.updateTime || ""
+  };
   dialogVisible.value = true;
 }
 
+function normalizeDateTime(input: string | Date) {
+  if (!input) return "";
+  const text = String(input);
+  return text.replace("T", " ").replace(/\.\d+\+00:00$/, "");
+}
+
 fetchData();
+
+function getStatusLabel(status: number) {
+  switch (status) {
+    case 1:
+      return "已领取";
+    case 2:
+      return "进行中";
+    case 3:
+      return "已完成";
+    case 4:
+      return "已取消";
+    default:
+      return "未知";
+  }
+}
+
+function getStatusTagType(status: number) {
+  switch (status) {
+    case 1:
+      return "warning";
+    case 2:
+      return "primary";
+    case 3:
+      return "success";
+    case 4:
+      return "danger";
+    default:
+      return "info";
+  }
+}
 </script>

@@ -25,7 +25,8 @@ import {
   getTodayRewardReceivers,
   getDailyTaskBar,
   getWeeklyCompletion,
-  getDailyStats
+  getDailyStats,
+  getLatestActivities
 } from "@/api/welcome";
 
 defineOptions({
@@ -89,7 +90,7 @@ const barChartData = ref([
 const progressData = ref([]);
 // 数据统计表格
 const tableData = ref([]);
-// 最新动态
+// 运营播报
 const latestNewsData = ref([]);
 
 onMounted(async () => {
@@ -160,12 +161,17 @@ onMounted(async () => {
       : stats.data;
   if (Array.isArray(tableArr)) {
     tableData.value = tableArr;
-    // 最新动态可用表格数据部分字段
-    latestNewsData.value = tableArr.slice(0, 14).map((item, idx) => ({
-      ...item,
-      date: item.statDate || item.date
-    }));
   }
+
+  const latestActivities = await getLatestActivities({ limit: 12 });
+  const activityArr =
+    latestActivities.data &&
+    typeof latestActivities.data === "object" &&
+    "records" in latestActivities.data &&
+    Array.isArray((latestActivities.data as any).records)
+      ? (latestActivities.data as any).records
+      : latestActivities.data;
+  latestNewsData.value = Array.isArray(activityArr) ? activityArr : [];
 });
 </script>
 
@@ -357,7 +363,7 @@ onMounted(async () => {
       >
         <el-card shadow="never">
           <div class="flex justify-between">
-            <span class="text-md font-medium">最新动态</span>
+            <span class="text-md font-medium">运营播报</span>
           </div>
           <el-scrollbar max-height="504" class="mt-3">
             <el-timeline>
@@ -375,13 +381,26 @@ onMounted(async () => {
                     })
                   )
                 "
-                :timestamp="item.date"
+                :timestamp="item.time"
               >
-                <p class="text-text_color_regular text-sm">
-                  {{
-                    `新增 ${item.requiredNumber} 条问题，${item.resolveNumber} 条已解决`
-                  }}
-                </p>
+                <div class="feed-item">
+                  <div class="feed-item__header">
+                    <span class="feed-item__title">{{ item.title }}</span>
+                    <el-tag
+                      size="small"
+                      :type="
+                        item.level === 'danger'
+                          ? 'danger'
+                          : item.level === 'warning'
+                            ? 'warning'
+                            : 'info'
+                      "
+                    >
+                      {{ item.type }}
+                    </el-tag>
+                  </div>
+                  <p class="feed-item__summary">{{ item.summary }}</p>
+                </div>
               </el-timeline-item>
             </el-timeline>
           </el-scrollbar>
@@ -422,5 +441,31 @@ onMounted(async () => {
 
 .main-content {
   margin: 20px 20px 0 !important;
+}
+
+.feed-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feed-item__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feed-item__title {
+  color: var(--el-text-color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feed-item__summary {
+  margin: 0;
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>

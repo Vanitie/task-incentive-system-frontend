@@ -84,6 +84,7 @@ declare global {
   interface PlatformConfigs {
     Version?: string;
     Title?: string;
+    LogoStyle?: "style1" | "style2" | string;
     FixedHeader?: boolean;
     HiddenSideBar?: boolean;
     MultiTagsCache?: boolean;

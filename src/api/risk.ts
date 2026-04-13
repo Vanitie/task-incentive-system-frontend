@@ -22,6 +22,8 @@ export interface RiskDashboardOverview {
   degradePass: number;
   review: number;
   freeze: number;
+  statusCounts?: Record<string, number>;
+  statusRates?: Record<string, number>;
   interceptRate: number;
   passRate: number;
   avgLatencyMs: number;
@@ -32,11 +34,12 @@ export interface RiskDashboardOverview {
 export interface RiskDailyTrendItem {
   date: string;
   total: number;
-  pass: number;
-  reject: number;
-  degradePass: number;
-  review: number;
-  freeze: number;
+  pass?: number;
+  reject?: number;
+  degradePass?: number;
+  review?: number;
+  freeze?: number;
+  statusCounts?: Record<string, number>;
 }
 
 export interface RiskRuleItem {
@@ -78,7 +81,9 @@ export interface RiskDecisionItem {
   requestId?: string;
   eventId?: string;
   taskId?: string | number;
+  taskName?: string;
   userId?: string | number;
+  userName?: string;
   decision: "PASS" | "REJECT" | "DEGRADE_PASS" | "REVIEW" | "FREEZE";
   reasonCode: string;
   hitRules: RiskHitRule[];
@@ -121,6 +126,7 @@ export interface RiskDecisionEvaluateResponse {
 
 export interface RiskQuotaItem {
   id: string | number;
+  quotaName?: string;
   scopeType: string;
   scopeId: string;
   resourceType?: string;
@@ -134,6 +140,7 @@ export interface RiskQuotaItem {
 
 export interface RiskQuotaRequest {
   id?: string | number;
+  quotaName?: string;
   scopeType: string;
   scopeId: string;
   resourceType: string;
@@ -246,7 +253,10 @@ export function createRiskListItem(
 export function getRiskDecisions(params?: {
   page?: number;
   size?: number;
+  userId?: string;
+  userName?: string;
   taskId?: string;
+  taskName?: string;
   decision?: string;
   start?: string;
   end?: string;
@@ -271,6 +281,7 @@ export function evaluateRiskDecision(data: RiskDecisionEvaluateRequest) {
 export function getRiskQuotas(params?: {
   page?: number;
   size?: number;
+  quotaName?: string;
   scopeType?: string;
   scopeId?: string;
   resourceType?: string;

@@ -8,7 +8,7 @@ export default {
   meta: {
     icon: "ri:shield-check-line",
     title: "风控规则",
-    rank: 4
+    rank: 5
   },
   children: [
     {
